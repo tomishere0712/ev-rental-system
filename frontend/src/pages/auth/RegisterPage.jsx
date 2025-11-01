@@ -59,10 +59,8 @@ const RegisterPage = () => {
       });
 
       if (response.success) {
-        const { token, ...user } = response.data;
-        setAuth(user, token);
-        toast.success("Đăng ký thành công!");
-        navigate("/renter/profile"); // Redirect to profile to upload documents
+        toast.success("Đăng ký thành công! Vui lòng đăng nhập.");
+        navigate("/login"); // Redirect to login page
       }
     } catch (error) {
       toast.error(error.response?.data?.message || "Đăng ký thất bại");
