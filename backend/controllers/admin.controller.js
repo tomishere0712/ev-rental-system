@@ -535,19 +535,27 @@ exports.updateUserRiskLevel = async (req, res) => {
   try {
     const { riskLevel, violationCount, notes } = req.body;
 
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      {
-        riskLevel,
-        violationCount:
-          violationCount !== undefined ? violationCount : user.violationCount,
-      },
-      { new: true }
-    ).select("-password");
-
-    if (!user) {
+    // Load existing user first to be able to fallback to current values
+    const existingUser = await User.findById(req.params.id).select("-password");
+    if (!existingUser) {
       return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }
+
+    const updatedFields = {
+      riskLevel: riskLevel !== undefined ? riskLevel : existingUser.riskLevel,
+      violationCount:
+        violationCount !== undefined
+          ? violationCount
+          : existingUser.violationCount,
+    };
+
+    // Only include notes if provided
+    if (notes !== undefined) updatedFields.notes = notes;
+
+    const user = await User.findByIdAndUpdate(req.params.id, updatedFields, {
+      new: true,
+      runValidators: true,
+    }).select("-password");
 
     res.json({
       success: true,
@@ -720,22 +728,57 @@ exports.getStaffPerformance = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy nhân viên" });
     }
 
+    // Number of bookings the staff verified (used earlier in other stats)
     const bookingsVerified = await Booking.countDocuments({
       verifiedBy: staff._id,
     });
 
+    // Number of payments processed by this staff (if tracked)
     const paymentsProcessed = await Payment.countDocuments({
       processedBy: staff._id,
     });
 
-    // Get last 30 days activity
+    // Count handovers (pickups processed by this staff)
+    const handoversCount = await Booking.countDocuments({
+      "pickupDetails.checkedInBy": staff._id,
+    });
+
+    // Count returns (returns processed by this staff)
+    const returnsCount = await Booking.countDocuments({
+      "returnDetails.checkedInBy": staff._id,
+    });
+
+    // Recent activity (last 30 days) based on verification or handovers
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const recentBookings = await Booking.countDocuments({
-      verifiedBy: staff._id,
-      verifiedAt: { $gte: thirtyDaysAgo },
+      $or: [
+        { verifiedBy: staff._id },
+        { "pickupDetails.checkedInBy": staff._id },
+        { "returnDetails.checkedInBy": staff._id },
+      ],
+      updatedAt: { $gte: thirtyDaysAgo },
     });
+
+    // Customer satisfaction proxy:
+    // Because there is no explicit rating/review model in the repo,
+    // we compute a simple proxy: percentage of returns processed by this staff
+    // that did NOT have a damageReport (i.e. no reported issues).
+    // If there are no returns processed, satisfactionScore will be null.
+    const returns = await Booking.find({
+      "returnDetails.checkedInBy": staff._id,
+    }).select("returnDetails.damageReport");
+
+    let satisfactionScore = null;
+    if (returns.length > 0) {
+      const cleanReturns = returns.filter(
+        (b) => !b.returnDetails?.damageReport
+      );
+      satisfactionScore = Math.round(
+        (cleanReturns.length / returns.length) * 100
+      ); // percent
+    }
 
     res.json({
       success: true,
@@ -744,7 +787,10 @@ exports.getStaffPerformance = async (req, res) => {
         performance: {
           bookingsVerified,
           paymentsProcessed,
+          handoversCount,
+          returnsCount,
           recentBookings,
+          satisfactionScore, // percent or null
         },
       },
     });

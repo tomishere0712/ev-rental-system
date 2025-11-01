@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { adminService } from "../../services";
 import { Users, Search, AlertTriangle, Ban, Shield, Eye } from "lucide-react";
+import toast from "react-hot-toast";
 
 const ManageUsersPage = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterRole, setFilterRole] = useState("all");
   const [selectedUser, setSelectedUser] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
@@ -17,8 +17,14 @@ const ManageUsersPage = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const data = await adminService.getAllUsers();
-      setUsers(data);
+      const res = await adminService.getAllUsers();
+      const usersArray =
+        res?.data?.users ||
+        res?.users ||
+        (Array.isArray(res) ? res : null) ||
+        [];
+
+      setUsers(Array.isArray(usersArray) ? usersArray : []);
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {
@@ -28,21 +34,28 @@ const ManageUsersPage = () => {
 
   const handleViewDetails = async (userId) => {
     try {
-      const userData = await adminService.getUserById(userId);
-      setSelectedUser(userData);
+      const res = await adminService.getUserById(userId);
+      // backend returns { success: true, data: { user, bookings, ... } }
+      const userObj = res?.data?.user || res?.user || res?.data || res;
+      setSelectedUser(userObj);
       setShowDetailsModal(true);
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to fetch user details");
+      toast.error(
+        error.response?.data?.message || "Failed to fetch user details"
+      );
     }
   };
 
   const handleUpdateRiskLevel = async (userId, riskLevel) => {
     try {
-      await adminService.updateUserRiskLevel(userId, riskLevel);
-      alert("Risk level updated successfully!");
+      // service expects an object body; send { riskLevel }
+      await adminService.updateUserRiskLevel(userId, { riskLevel });
+      toast.success("Risk level updated successfully!");
       fetchUsers();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to update risk level");
+      toast.error(
+        error.response?.data?.message || "Failed to update risk level"
+      );
     }
   };
 
@@ -50,11 +63,16 @@ const ManageUsersPage = () => {
     if (!confirm("Are you sure you want to block/unblock this user?")) return;
 
     try {
-      await adminService.blockUser(userId);
-      alert("User status updated successfully!");
+      const user = users.find((u) => u._id === userId);
+      const newIsActive = user ? !user.isActive : false;
+
+      await adminService.blockUser(userId, newIsActive);
+      toast.success("User status updated successfully!");
       fetchUsers();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to update user status");
+      toast.error(
+        error.response?.data?.message || "Failed to update user status"
+      );
     }
   };
 
@@ -63,16 +81,14 @@ const ManageUsersPage = () => {
       user.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.phone?.includes(searchQuery);
-    const matchesRole = filterRole === "all" || user.role === filterRole;
-    return matchesSearch && matchesRole;
+    return matchesSearch;
   });
 
   const getRiskBadge = (riskLevel) => {
     const badges = {
-      low: "bg-green-100 text-green-800",
-      medium: "bg-yellow-100 text-yellow-800",
-      high: "bg-orange-100 text-orange-800",
-      critical: "bg-red-100 text-red-800",
+      low: "bg-gray-100 text-green-500",
+      medium: "bg-gray-100 text-yellow-500",
+      high: "bg-gray-100 text-red-500",
     };
     return badges[riskLevel] || "bg-gray-100 text-gray-800";
   };
@@ -101,67 +117,46 @@ const ManageUsersPage = () => {
         <p className="text-gray-600 mt-2">View and manage all system users</p>
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, email, or phone..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-          <div className="w-full md:w-48">
-            <select
-              value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Roles</option>
-              <option value="renter">Renters</option>
-              <option value="staff">Staff</option>
-              <option value="admin">Admins</option>
-            </select>
+        <div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, email, or phone..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-4">
-          <p className="text-sm text-gray-600">Total Users</p>
-          <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+          <p className="text-sm text-gray-600">Total Renter</p>
+          <p className="text-2xl font-bold text-blue-700">{users.length}</p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4">
-          <p className="text-sm text-gray-600">Renters</p>
-          <p className="text-2xl font-bold text-blue-600">
-            {users.filter((u) => u.role === "renter").length}
+          <p className="text-sm text-gray-600">Active</p>
+          <p className="text-2xl font-bold text-green-600">
+            {users.filter((u) => u.isActive).length}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4">
-          <p className="text-sm text-gray-600">Staff</p>
-          <p className="text-2xl font-bold text-green-600">
-            {users.filter((u) => u.role === "staff").length}
+          <p className="text-sm text-gray-600">Inactive</p>
+          <p className="text-2xl font-bold text-gray-600">
+            {users.filter((u) => !u.isActive).length}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4">
           <p className="text-sm text-gray-600">High Risk</p>
           <p className="text-2xl font-bold text-red-600">
-            {
-              users.filter(
-                (u) => u.riskLevel === "high" || u.riskLevel === "critical"
-              ).length
-            }
+            {users.filter((u) => u.riskLevel === "high").length}
           </p>
         </div>
       </div>
 
-      {/* Users Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -226,20 +221,19 @@ const ManageUsersPage = () => {
                       onChange={(e) =>
                         handleUpdateRiskLevel(user._id, e.target.value)
                       }
-                      className={`px-3 py-1 rounded-full text-xs font-semibold border-0 cursor-pointer ${getRiskBadge(
+                      className={`p-1 rounded-full text-xs font-semibold border-0 cursor-pointer ${getRiskBadge(
                         user.riskLevel
                       )}`}
                     >
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
                       <option value="high">High</option>
-                      <option value="critical">Critical</option>
                     </select>
                   </td>
                   <td className="px-6 py-4">
-                    {user.isBlocked ? (
+                    {!user.isActive ? (
                       <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                        Blocked
+                        Inactive
                       </span>
                     ) : (
                       <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
@@ -259,16 +253,16 @@ const ManageUsersPage = () => {
                       <button
                         onClick={() => handleBlockUser(user._id)}
                         className={`p-2 rounded ${
-                          user.isBlocked
-                            ? "text-green-600 hover:bg-green-50"
-                            : "text-red-600 hover:bg-red-50"
+                          user.isActive
+                            ? "text-red-600 hover:bg-red-50"
+                            : "text-green-600 hover:bg-green-50"
                         }`}
-                        title={user.isBlocked ? "Unblock User" : "Block User"}
+                        title={user.isActive ? "Block User" : "Unblock User"}
                       >
-                        {user.isBlocked ? (
-                          <Shield className="w-4 h-4" />
-                        ) : (
+                        {user.isActive ? (
                           <Ban className="w-4 h-4" />
+                        ) : (
+                          <Shield className="w-4 h-4" />
                         )}
                       </button>
                     </div>
@@ -287,7 +281,6 @@ const ManageUsersPage = () => {
         )}
       </div>
 
-      {/* User Details Modal */}
       {showDetailsModal && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -355,7 +348,6 @@ const ManageUsersPage = () => {
                 </div>
               </div>
 
-              {/* Booking History */}
               {selectedUser.bookingHistory &&
                 selectedUser.bookingHistory.length > 0 && (
                   <div>

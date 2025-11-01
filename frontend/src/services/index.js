@@ -280,7 +280,7 @@ export const adminService = {
   },
 
   // Stations
-  getStations: async () => {
+  getAllStations: async () => {
     const response = await api.get("/admin/stations");
     return response.data;
   },
@@ -301,7 +301,7 @@ export const adminService = {
   },
 
   // Users
-  getUsers: async (params) => {
+  getAllUsers: async (params) => {
     const response = await api.get("/admin/users", { params });
     return response.data;
   },
@@ -322,7 +322,7 @@ export const adminService = {
   },
 
   // Staff
-  getStaff: async () => {
+  getAllStaff: async () => {
     const response = await api.get("/admin/staff");
     return response.data;
   },
