@@ -12,6 +12,8 @@ exports.getVehicles = async (req, res) => {
       status,
       minPrice,
       maxPrice,
+      minBattery,
+      search,
       page = 1,
       limit = 12,
     } = req.query;
@@ -28,6 +30,19 @@ exports.getVehicles = async (req, res) => {
       filter.pricePerHour = {};
       if (minPrice) filter.pricePerHour.$gte = Number(minPrice);
       if (maxPrice) filter.pricePerHour.$lte = Number(maxPrice);
+    }
+
+    // Battery filter
+    if (minBattery) {
+      filter.currentBatteryLevel = { $gte: Number(minBattery) };
+    }
+
+    // Search filter (name or model)
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { model: { $regex: search, $options: "i" } },
+      ];
     }
 
     // Pagination
