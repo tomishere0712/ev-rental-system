@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
 
 // Generate JWT Token
 const generateToken = (id, role) => {
@@ -16,10 +17,18 @@ exports.register = async (req, res) => {
   try {
     const { email, password, fullName, phone, role } = req.body;
 
-    // Check if user exists
-    const userExists = await User.findOne({ email });
-    if (userExists) {
+    // Check if email exists
+    const emailExists = await User.findOne({ email });
+    if (emailExists) {
       return res.status(400).json({ message: "Email đã được sử dụng" });
+    }
+
+    // Check if phone exists
+    if (phone) {
+      const phoneExists = await User.findOne({ phone });
+      if (phoneExists) {
+        return res.status(400).json({ message: "Số điện thoại đã được sử dụng" });
+      }
     }
 
     // Create user
@@ -43,6 +52,7 @@ exports.register = async (req, res) => {
         phone: user.phone,
         role: user.role,
         isVerified: user.isVerified,
+        verificationStatus: user.verificationStatus,
         token,
       },
     });
@@ -101,6 +111,8 @@ exports.login = async (req, res) => {
         isVerified: user.isVerified,
         driverLicense: user.driverLicense,
         nationalId: user.nationalId,
+        verificationStatus: user.verificationStatus,
+        verificationNote: user.verificationNote,
         token,
       },
     });
@@ -149,28 +161,67 @@ exports.uploadDocuments = async (req, res) => {
       });
     }
 
+    // Kiểm tra nếu đang pending thì không cho upload lại
+    if (user.verificationStatus === "pending") {
+      return res.status(400).json({ 
+        success: false,
+        message: "Hồ sơ đang được xét duyệt. Vui lòng chờ kết quả." 
+      });
+    }
+
     // Upload driver license to Cloudinary
     if (req.files.driverLicense) {
-      const file = req.files.driverLicense[0];
-      const result = await cloudinary.uploader.upload(file.path, {
-        folder: "ev-rental/driver-licenses",
-        resource_type: "image",
-      });
-      user.driverLicense = result.secure_url;
+      const driverLicenseImages = [];
+      const files = Array.isArray(req.files.driverLicense)
+        ? req.files.driverLicense
+        : [req.files.driverLicense];
+
+      for (const file of files) {
+        const result = await cloudinary.uploader.upload(file.path, {
+          folder: "ev-rental/driver-licenses",
+          resource_type: "image",
+        });
+        driverLicenseImages.push(result.secure_url);
+        
+        // Delete temporary file
+        fs.unlinkSync(file.path);
+      }
+
+      user.driverLicense = {
+        number: req.body.driverLicenseNumber || "",
+        images: driverLicenseImages,
+        verified: false,
+      };
     }
 
     // Upload national ID to Cloudinary
     if (req.files.nationalId) {
-      const file = req.files.nationalId[0];
-      const result = await cloudinary.uploader.upload(file.path, {
-        folder: "ev-rental/national-ids",
-        resource_type: "image",
-      });
-      user.nationalId = result.secure_url;
+      const nationalIdImages = [];
+      const files = Array.isArray(req.files.nationalId)
+        ? req.files.nationalId
+        : [req.files.nationalId];
+
+      for (const file of files) {
+        const result = await cloudinary.uploader.upload(file.path, {
+          folder: "ev-rental/national-ids",
+          resource_type: "image",
+        });
+        nationalIdImages.push(result.secure_url);
+        
+        // Delete temporary file
+        fs.unlinkSync(file.path);
+      }
+
+      user.nationalId = {
+        number: req.body.nationalIdNumber || "",
+        images: nationalIdImages,
+        verified: false,
+      };
     }
 
     // Set verification status to pending
-    user.isVerified = false;
+    user.verificationStatus = "pending";
+    user.verificationNote = "";
 
     await user.save();
 
@@ -185,10 +236,10 @@ exports.uploadDocuments = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Upload error:", error);
+    console.error("Upload documents error:", error);
     res.status(500).json({ 
       success: false,
-      message: error.message || "Lỗi khi upload giấy tờ" 
+      message: error.message 
     });
   }
 };
