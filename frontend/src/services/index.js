@@ -71,6 +71,11 @@ export const vehicleService = {
     return response.data;
   },
 
+  getVehicles: async (params = {}) => {
+    const response = await api.get("/vehicles", { params });
+    return response.data;
+  },
+
   getById: async (id) => {
     const response = await api.get(`/vehicles/${id}`);
     return response.data;
