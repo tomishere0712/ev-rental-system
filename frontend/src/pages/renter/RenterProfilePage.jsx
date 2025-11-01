@@ -132,16 +132,16 @@ const RenterProfilePage = () => {
     });
   };
 
-  const handleRemoveFile = (docType) => {
-    setDocuments({
-      ...documents,
-      [docType]: null,
-    });
-    setPreviews({
-      ...previews,
-      [docType]: null,
-    });
-  };
+  // const handleRemoveFile = (docType) => {
+  //   setDocuments({
+  //     ...documents,
+  //     [docType]: null,
+  //   });
+  //   setPreviews({
+  //     ...previews,
+  //     [docType]: null,
+  //   });
+  // };
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
