@@ -4,10 +4,19 @@ const cors = require("cors");
 const helmet = require("helmet");
 const compression = require("compression");
 const morgan = require("morgan");
+const fs = require("fs");
+const path = require("path");
 const connectDB = require("./config/database");
 
 // Load environment variables
 dotenv.config();
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log("✅ Created uploads directory");
+}
 
 // Connect to MongoDB
 connectDB();
@@ -21,6 +30,9 @@ app.use(compression()); // Compress responses
 app.use(morgan("dev")); // Logging
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+
+// Serve uploaded files
+app.use("/uploads", express.static(uploadsDir));
 
 // Routes
 app.use("/api/auth", require("./routes/auth.routes"));

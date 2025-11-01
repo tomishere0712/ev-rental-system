@@ -54,7 +54,100 @@ const LoginPage = () => {
         }
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Đăng nhập thất bại");
+      // Xử lý các loại lỗi cụ thể
+      if (error.response) {
+        const status = error.response.status;
+        const message = error.response.data?.message;
+
+        if (status === 401) {
+          // Lỗi xác thực - sai email hoặc mật khẩu
+          toast.error(message || "Email hoặc mật khẩu không đúng!", {
+            duration: 5000,
+            icon: "🔒",
+            style: {
+              background: "#ef4444",
+              color: "#fff",
+              padding: "16px",
+              borderRadius: "10px",
+              fontSize: "15px",
+              fontWeight: "600",
+              boxShadow: "0 4px 12px rgba(239, 68, 68, 0.4)",
+            },
+          });
+        } else if (status === 400) {
+          // Lỗi dữ liệu đầu vào
+          toast.error(message || "Thông tin đăng nhập không hợp lệ!", {
+            duration: 5000,
+            icon: "⚠️",
+            style: {
+              background: "#ef4444",
+              color: "#fff",
+              padding: "16px",
+              borderRadius: "10px",
+              fontSize: "15px",
+              fontWeight: "600",
+              boxShadow: "0 4px 12px rgba(239, 68, 68, 0.4)",
+            },
+          });
+        } else if (status === 500) {
+          // Lỗi server
+          toast.error("Lỗi hệ thống! Vui lòng thử lại sau.", {
+            duration: 5000,
+            icon: "❌",
+            style: {
+              background: "#ef4444",
+              color: "#fff",
+              padding: "16px",
+              borderRadius: "10px",
+              fontSize: "15px",
+              fontWeight: "600",
+              boxShadow: "0 4px 12px rgba(239, 68, 68, 0.4)",
+            },
+          });
+        } else {
+          toast.error(message || "Đăng nhập thất bại!", {
+            duration: 5000,
+            style: {
+              background: "#ef4444",
+              color: "#fff",
+              padding: "16px",
+              borderRadius: "10px",
+              fontSize: "15px",
+              fontWeight: "600",
+              boxShadow: "0 4px 12px rgba(239, 68, 68, 0.4)",
+            },
+          });
+        }
+      } else if (error.request) {
+        // Không nhận được phản hồi từ server
+        toast.error("Không thể kết nối tới server! Vui lòng kiểm tra kết nối.", {
+          duration: 5000,
+          icon: "🌐",
+          style: {
+            background: "#ef4444",
+            color: "#fff",
+            padding: "16px",
+            borderRadius: "10px",
+            fontSize: "15px",
+            fontWeight: "600",
+            boxShadow: "0 4px 12px rgba(239, 68, 68, 0.4)",
+          },
+        });
+      } else {
+        // Lỗi khác
+        toast.error("Đã xảy ra lỗi! Vui lòng thử lại.", {
+          duration: 5000,
+          style: {
+            background: "#ef4444",
+            color: "#fff",
+            padding: "16px",
+            borderRadius: "10px",
+            fontSize: "15px",
+            fontWeight: "600",
+            boxShadow: "0 4px 12px rgba(239, 68, 68, 0.4)",
+          },
+        });
+      }
     } finally {
       setLoading(false);
     }
