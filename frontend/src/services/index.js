@@ -205,6 +205,27 @@ export const staffService = {
     const response = await api.post("/staff/payments", data);
     return response.data;
   },
+
+  // 🆕 Verifications
+  getPendingVerifications: async () => {
+    const response = await api.get("/staff/verifications/pending");
+    return response.data;
+  },
+
+  verifyUserDocuments: async (userId, data) => {
+    const response = await api.patch(`/staff/verifications/${userId}`, data);
+    return response.data;
+  },
+  getApprovedVerifications: async () => {
+    const response = await api.get("/staff/verifications/approved");
+    return response.data;
+  },
+
+  getRejectedVerifications: async () => {
+    const response = await api.get("/staff/verifications/rejected");
+    return response.data;
+  },
+
 };
 
 // Admin Services
