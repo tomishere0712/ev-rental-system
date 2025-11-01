@@ -97,6 +97,100 @@ exports.verifyCustomer = async (req, res) => {
   }
 };
 
+// @desc    Lấy danh sách renter đang chờ xác minh giấy tờ
+// @route   GET /api/staff/verifications/pending
+// @access  Private/Staff
+exports.getPendingVerifications = async (req, res) => {
+  try {
+    const users = await User.find({ verificationStatus: "pending" }).select(
+      "fullName email phone driverLicense nationalId verificationStatus"
+    );
+    res.json({ success: true, count: users.length, data: users });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Nhân viên xác minh hoặc từ chối hồ sơ renter
+// @route   PATCH /api/staff/verifications/:userId
+// @access  Private/Staff
+exports.verifyUserDocuments = async (req, res) => {
+  try {
+    const { approved, note } = req.body;
+    const user = await User.findById(req.params.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+
+    if (user.role !== "renter") {
+      return res
+        .status(400)
+        .json({ message: "Chỉ có thể xác minh hồ sơ người thuê" });
+    }
+
+    // ✅ Bắt buộc nhập note khi từ chối
+    if (!approved && (!note || note.trim() === "")) {
+      return res.status(400).json({
+        message: "Vui lòng nhập lý do từ chối hồ sơ.",
+      });
+    }
+
+    user.driverLicense.verified = approved;
+    user.nationalId.verified = approved;
+    user.verificationStatus = approved ? "approved" : "rejected";
+    user.verificationNote = note || "";
+    user.isVerified = approved;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: approved
+        ? "✅ Đã phê duyệt hồ sơ người thuê"
+        : "❌ Đã từ chối hồ sơ người thuê",
+      data: user,
+    });
+  } catch (error) {
+    console.error("verifyUserDocuments error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Lấy danh sách renter đã được phê duyệt
+// @route   GET /api/staff/verifications/approved
+// @access  Private/Staff
+exports.getApprovedVerifications = async (req, res) => {
+  try {
+    const users = await User.find({ verificationStatus: "approved" }).select(
+      "fullName email phone driverLicense nationalId verificationStatus verificationNote updatedAt"
+    );
+
+    res.json({ success: true, count: users.length, data: users });
+  } catch (error) {
+    console.error("getApprovedVerifications error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Lấy danh sách renter bị từ chối + lý do
+// @route   GET /api/staff/verifications/rejected
+// @access  Private/Staff
+exports.getRejectedVerifications = async (req, res) => {
+  try {
+    const users = await User.find({ verificationStatus: "rejected" }).select(
+      "fullName email phone driverLicense nationalId verificationStatus verificationNote updatedAt"
+    );
+
+    res.json({ success: true, count: users.length, data: users });
+  } catch (error) {
+    console.error("getRejectedVerifications error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+
 // @desc    Handover vehicle to customer
 // @route   PUT /api/staff/bookings/:id/handover
 // @access  Private/Staff

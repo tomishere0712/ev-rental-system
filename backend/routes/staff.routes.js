@@ -28,4 +28,17 @@ router.put("/vehicles/:id/status", staffController.updateVehicleStatus);
 // Payments
 router.post("/payments", staffController.processPayment);
 
+// Lấy danh sách renter có trạng thái pending
+router.get("/verifications/pending", staffController.getPendingVerifications);
+
+// ✅ Lấy danh sách renter đã được phê duyệt
+router.get("/verifications/approved", staffController.getApprovedVerifications);
+
+// ✅ Lấy danh sách renter bị từ chối
+router.get("/verifications/rejected", staffController.getRejectedVerifications);
+
+// ✅ Nhân viên xác minh (phê duyệt / từ chối)
+router.patch("/verifications/:userId", staffController.verifyUserDocuments);
+
+
 module.exports = router;
