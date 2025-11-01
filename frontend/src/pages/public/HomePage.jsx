@@ -57,26 +57,28 @@ const HomePage = () => {
         <>
           {/* Chưa upload giấy tờ */}
           {(!user.verificationStatus || user.verificationStatus === "none") && (
-            <div className="bg-yellow-50 border-b-2 border-yellow-400">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-b-4 border-amber-400 shadow-sm">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
                 <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div className="flex items-start gap-3 flex-1">
-                    <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="bg-amber-100 p-3 rounded-full">
+                      <AlertCircle className="w-6 h-6 text-amber-600" />
+                    </div>
                     <div>
-                      <h3 className="text-yellow-900 font-semibold text-lg mb-1">
-                        Tài khoản chưa được xác thực
+                      <h3 className="text-amber-900 font-bold text-lg mb-1.5">
+                        🔐 Tài khoản chưa được xác thực
                       </h3>
-                      <p className="text-yellow-800 text-sm">
-                        Vui lòng upload <strong>Giấy phép lái xe</strong> và <strong>CMND/CCCD</strong> để có thể đặt xe và sử dụng đầy đủ dịch vụ.
+                      <p className="text-amber-800 text-sm leading-relaxed">
+                        Upload <strong>Giấy phép lái xe</strong> và <strong>CMND/CCCD</strong> để trải nghiệm đầy đủ dịch vụ thuê xe điện.
                       </p>
                     </div>
                   </div>
                   <Link
                     to="/renter/profile"
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors flex items-center gap-2 whitespace-nowrap"
+                    className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
                   >
                     Xác thực ngay
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-5 h-5" />
                   </Link>
                 </div>
               </div>
@@ -85,26 +87,28 @@ const HomePage = () => {
 
           {/* Đang chờ xét duyệt */}
           {user.verificationStatus === "pending" && (
-            <div className="bg-blue-50 border-b-2 border-blue-400">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b-4 border-blue-400 shadow-sm">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
                 <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div className="flex items-start gap-3 flex-1">
-                    <Clock className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="bg-blue-100 p-3 rounded-full animate-pulse">
+                      <Clock className="w-6 h-6 text-blue-600" />
+                    </div>
                     <div>
-                      <h3 className="text-blue-900 font-semibold text-lg mb-1">
-                        Hồ sơ đang được xét duyệt
+                      <h3 className="text-blue-900 font-bold text-lg mb-1.5">
+                        ⏳ Hồ sơ đang được xét duyệt
                       </h3>
-                      <p className="text-blue-800 text-sm">
-                        Chúng tôi đang xem xét hồ sơ của bạn. Quá trình này có thể mất <strong>24-48 giờ</strong>. Bạn sẽ nhận được thông báo khi có kết quả.
+                      <p className="text-blue-800 text-sm leading-relaxed">
+                        Chúng tôi đang xem xét hồ sơ của bạn. Quá trình này thường mất <strong>24-48 giờ</strong>. Bạn sẽ nhận thông báo ngay khi có kết quả.
                       </p>
                     </div>
                   </div>
                   <Link
                     to="/renter/profile"
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors flex items-center gap-2 whitespace-nowrap"
+                    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
                   >
                     Xem chi tiết
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-5 h-5" />
                   </Link>
                 </div>
               </div>
@@ -113,29 +117,31 @@ const HomePage = () => {
 
           {/* Bị từ chối */}
           {user.verificationStatus === "rejected" && (
-            <div className="bg-red-50 border-b-2 border-red-400">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="bg-gradient-to-r from-red-50 to-rose-50 border-b-4 border-red-400 shadow-sm">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
                 <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div className="flex items-start gap-3 flex-1">
-                    <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="bg-red-100 p-3 rounded-full">
+                      <AlertCircle className="w-6 h-6 text-red-600" />
+                    </div>
                     <div>
-                      <h3 className="text-red-900 font-semibold text-lg mb-1">
-                        Hồ sơ xác thực bị từ chối
+                      <h3 className="text-red-900 font-bold text-lg mb-1.5">
+                        ❌ Hồ sơ xác thực bị từ chối
                       </h3>
-                      <p className="text-red-800 text-sm mb-2">
-                        {user.verificationNote || "Giấy tờ không hợp lệ hoặc không rõ ràng. Vui lòng upload lại."}
+                      <p className="text-red-800 text-sm mb-2 leading-relaxed">
+                        <strong>Lý do:</strong> {user.verificationNote || "Giấy tờ không hợp lệ hoặc không rõ ràng."}
                       </p>
                       <p className="text-red-700 text-sm font-medium">
-                        Vui lòng kiểm tra và upload lại giấy tờ hợp lệ.
+                        💡 Vui lòng kiểm tra và upload lại giấy tờ hợp lệ, rõ nét.
                       </p>
                     </div>
                   </div>
                   <Link
                     to="/renter/profile"
-                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors flex items-center gap-2 whitespace-nowrap"
+                    className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
                   >
                     Upload lại
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-5 h-5" />
                   </Link>
                 </div>
               </div>
@@ -145,51 +151,101 @@ const HomePage = () => {
       )}
 
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-primary-600 to-primary-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+      <section className="relative bg-gradient-to-br from-green-600 via-emerald-600 to-teal-600 text-white overflow-hidden">
+        {/* Animated background pattern with battery and lightning */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 left-10 text-8xl animate-bounce">⚡</div>
+          <div className="absolute top-20 right-20 text-6xl animate-pulse delay-300">🔋</div>
+          <div className="absolute bottom-20 left-1/4 text-7xl animate-bounce delay-500">🚗</div>
+          <div className="absolute top-1/3 right-1/3 text-5xl animate-pulse delay-700">⚡</div>
+          <div className="absolute bottom-1/4 right-1/4 text-6xl animate-bounce delay-1000">🔋</div>
+        </div>
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-green-900/20 to-transparent"></div>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              Thuê xe điện thông minh
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-5 py-2.5 rounded-full mb-6 border border-white/30">
+              <Battery className="w-5 h-5 text-yellow-300" />
+              <span className="text-sm font-semibold">100% Điện</span>
+              
+              <span className="text-sm font-semibold">0% Khí thải</span>
+              <Zap className="w-5 h-5 text-yellow-300 animate-pulse" />
+            </div>
+            
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold mb-6 leading-tight">
+              <span className="flex items-center justify-center gap-3 flex-wrap">
+                <span>Thuê xe điện</span>
+              </span>
+              <span className="text-green-200 flex items-center justify-center gap-2 mt-2">
+                Thông minh & Xanh
+              </span>
             </h1>
-            <p className="text-xl md:text-2xl mb-8 text-primary-100">
-              Giải pháp di chuyển xanh, tiết kiệm và thân thiện môi trường
+            
+            <p className="text-xl md:text-2xl mb-10 text-green-50 max-w-3xl mx-auto leading-relaxed">
+              Di chuyển thông minh với năng lượng sạch <span className="text-yellow-300">⚡</span> - 
+              Pin đầy đủ <span className="text-yellow-300">🔋</span> - 
+              Xe chất lượng <span className="text-green-200">🚗</span>
             </p>
 
             {/* Search Box */}
-            <form onSubmit={handleSearch} className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-lg shadow-xl p-2 flex gap-2">
-                <div className="flex-1 flex items-center px-4">
-                  <Search className="w-5 h-5 text-gray-400 mr-3" />
+            <form onSubmit={handleSearch} className="max-w-3xl mx-auto mb-8">
+              <div className="bg-white rounded-2xl shadow-2xl p-3 flex gap-3 transform hover:scale-105 transition-transform">
+                <div className="flex-1 flex items-center px-4 bg-gray-50 rounded-xl">
+                  <Search className="w-5 h-5 text-green-600 mr-3" />
                   <input
                     type="text"
                     placeholder="Tìm xe điện: Tesla, VinFast, scooter..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full py-3 text-gray-900 placeholder-gray-500 focus:outline-none"
+                    className="w-full py-4 text-gray-900 placeholder-gray-500 focus:outline-none bg-transparent"
                   />
                 </div>
                 <button
                   type="submit"
-                  className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-md font-semibold transition-colors"
+                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-10 py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
                 >
-                  Tìm kiếm
+                  Tìm ngay
                 </button>
               </div>
             </form>
 
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <div className="flex flex-wrap justify-center gap-4">
               <Link
                 to="/vehicles"
-                className="bg-white text-primary-600 px-8 py-3 rounded-lg font-semibold hover:bg-primary-50 transition-colors"
+                className="bg-white text-green-600 px-8 py-4 rounded-xl font-bold hover:bg-green-50 transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
               >
-                Xem tất cả xe
+                <Car className="w-5 h-5" />
+                Xem tất cả xe 
               </Link>
               <Link
                 to="/stations"
-                className="bg-primary-500 bg-opacity-20 backdrop-blur-sm border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-opacity-30 transition-colors"
+                className="bg-green-500/20 backdrop-blur-sm border-2 border-white text-white px-8 py-4 rounded-xl font-bold hover:bg-green-500/30 transition-all flex items-center gap-2"
               >
-                Tìm điểm thuê
+                <Battery className="w-5 h-5" />
+                Trạm sạc 
               </Link>
+            </div>
+
+            {/* Feature highlights */}
+            <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="text-4xl mb-2">⚡</div>
+                <div className="font-bold text-lg">Sạc nhanh</div>
+                <div className="text-green-100 text-sm">30 phút đầy pin</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="text-4xl mb-2">🔋</div>
+                <div className="font-bold text-lg">Pin bền bỉ</div>
+                <div className="text-green-100 text-sm">Quãng đường xa</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="text-4xl mb-2">🚗</div>
+                <div className="font-bold text-lg">Xe hiện đại</div>
+                <div className="text-green-100 text-sm">An toàn & tiện nghi</div>
+              </div>
             </div>
           </div>
         </div>
@@ -300,27 +356,86 @@ const HomePage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-primary-600 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Bắt đầu hành trình xanh của bạn ngay hôm nay
+      <section className="relative bg-gradient-to-br from-green-600 via-emerald-600 to-teal-700 text-white py-20 overflow-hidden">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 right-10 text-9xl animate-pulse">⚡</div>
+          <div className="absolute bottom-10 left-10 text-9xl animate-bounce">🔋</div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-9xl opacity-5">🚗</div>
+        </div>
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-green-900/30 to-transparent"></div>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          {/* Badge */}
+          
+
+          {/* Title with emoji */}
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight">
+            <span className="flex items-center justify-center gap-3 flex-wrap">
+              <span>🌱</span>
+              <span>Bắt đầu hành trình xanh</span>
+            </span>
+            <span className="text-green-200 block mt-2">
+              của bạn ngay hôm nay
+            </span>
           </h2>
-          <p className="text-xl text-primary-100 mb-8">
-            Hơn 10,000+ khách hàng đã tin tưởng sử dụng dịch vụ của chúng tôi
+
+          {/* Stats */}
+          <div className="flex flex-wrap justify-center gap-8 mb-8">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-4 border border-white/20">
+              <div className="text-3xl font-bold text-yellow-300">10,000+</div>
+              <div className="text-green-100 text-sm">Khách hàng tin tưởng</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-4 border border-white/20">
+              <div className="text-3xl font-bold text-yellow-300">50+</div>
+              <div className="text-green-100 text-sm">Loại xe đa dạng</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-4 border border-white/20">
+              <div className="text-3xl font-bold text-yellow-300">24/7</div>
+              <div className="text-green-100 text-sm">Hỗ trợ khách hàng</div>
+            </div>
+          </div>
+
+          <p className="text-xl md:text-2xl text-green-50 mb-10 max-w-3xl mx-auto">
+            Tham gia cộng đồng di chuyển xanh <span className="text-yellow-300">⚡</span> - 
+            Tiết kiệm chi phí <span className="text-yellow-300">💰</span> - 
+            Bảo vệ môi trường <span className="text-green-200">🌍</span>
           </p>
-          <div className="flex flex-wrap justify-center gap-4">
+
+          {/* CTA Buttons */}
+          <div className="flex flex-wrap justify-center gap-4 mb-8">
             <Link
               to="/register"
-              className="bg-white text-primary-600 px-8 py-3 rounded-lg font-semibold hover:bg-primary-50 transition-colors"
+              className="group bg-white text-green-600 px-10 py-4 rounded-xl font-bold hover:bg-green-50 transition-all shadow-xl hover:shadow-2xl hover:scale-105 flex items-center gap-2"
             >
-              Đăng ký miễn phí
+              <span>Đăng ký miễn phí</span>
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
               to="/vehicles"
-              className="bg-primary-500 border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+              className="group bg-green-500/20 backdrop-blur-sm border-2 border-white text-white px-10 py-4 rounded-xl font-bold hover:bg-white/30 transition-all flex items-center gap-2"
             >
-              Khám phá xe
+              <Car className="w-5 h-5" />
+              <span>Khám phá xe điện</span>
             </Link>
+          </div>
+
+          {/* Trust badges */}
+          <div className="flex flex-wrap justify-center items-center gap-6 text-green-100 text-sm">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5" />
+              <span>Bảo mật an toàn</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5" />
+              <span>Đăng ký nhanh chóng</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Battery className="w-5 h-5" />
+              <span>100% thân thiện môi trường</span>
+            </div>
           </div>
         </div>
       </section>
