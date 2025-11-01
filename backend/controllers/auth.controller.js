@@ -134,71 +134,62 @@ exports.getMe = async (req, res) => {
 // @access  Private (Renter)
 exports.uploadDocuments = async (req, res) => {
   try {
-    const { driverLicenseNumber, nationalIdNumber } = req.body;
-
     if (!req.files || (!req.files.driverLicense && !req.files.nationalId)) {
-      return res.status(400).json({ message: "Vui lòng upload giấy tờ" });
+      return res.status(400).json({ 
+        success: false,
+        message: "Vui lòng upload đầy đủ 2 giấy tờ" 
+      });
     }
 
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(404).json({ message: "Người dùng không tồn tại" });
+      return res.status(404).json({ 
+        success: false,
+        message: "Người dùng không tồn tại" 
+      });
     }
 
-    // Upload driver license images to Cloudinary
+    // Upload driver license to Cloudinary
     if (req.files.driverLicense) {
-      const driverLicenseImages = [];
-      const files = Array.isArray(req.files.driverLicense)
-        ? req.files.driverLicense
-        : [req.files.driverLicense];
-
-      for (const file of files) {
-        const result = await cloudinary.uploader.upload(file.path, {
-          folder: "ev-rental/driver-licenses",
-        });
-        driverLicenseImages.push(result.secure_url);
-      }
-
-      user.driverLicense = {
-        number: driverLicenseNumber,
-        images: driverLicenseImages,
-        verified: false,
-      };
+      const file = req.files.driverLicense[0];
+      const result = await cloudinary.uploader.upload(file.path, {
+        folder: "ev-rental/driver-licenses",
+        resource_type: "image",
+      });
+      user.driverLicense = result.secure_url;
     }
 
-    // Upload national ID images to Cloudinary
+    // Upload national ID to Cloudinary
     if (req.files.nationalId) {
-      const nationalIdImages = [];
-      const files = Array.isArray(req.files.nationalId)
-        ? req.files.nationalId
-        : [req.files.nationalId];
-
-      for (const file of files) {
-        const result = await cloudinary.uploader.upload(file.path, {
-          folder: "ev-rental/national-ids",
-        });
-        nationalIdImages.push(result.secure_url);
-      }
-
-      user.nationalId = {
-        number: nationalIdNumber,
-        images: nationalIdImages,
-        verified: false,
-      };
+      const file = req.files.nationalId[0];
+      const result = await cloudinary.uploader.upload(file.path, {
+        folder: "ev-rental/national-ids",
+        resource_type: "image",
+      });
+      user.nationalId = result.secure_url;
     }
+
+    // Set verification status to pending
+    user.isVerified = false;
 
     await user.save();
 
+    // Return updated user without password
+    const updatedUser = await User.findById(user._id).select("-password");
+
     res.json({
       success: true,
-      message: "Upload giấy tờ thành công. Chờ nhân viên xác thực.",
+      message: "Upload giấy tờ thành công! Đang chờ xét duyệt.",
       data: {
-        driverLicense: user.driverLicense,
-        nationalId: user.nationalId,
+        user: updatedUser,
       },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Upload error:", error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message || "Lỗi khi upload giấy tờ" 
+    });
   }
 };
 

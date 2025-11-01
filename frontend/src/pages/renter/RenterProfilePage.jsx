@@ -9,11 +9,13 @@ import {
   CheckCircle,
   AlertCircle,
   Save,
+  X,
+  Image as ImageIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 const RenterProfilePage = () => {
-  const { user, setUser } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
@@ -22,6 +24,10 @@ const RenterProfilePage = () => {
     phone: "",
   });
   const [documents, setDocuments] = useState({
+    driverLicense: null,
+    nationalId: null,
+  });
+  const [previews, setPreviews] = useState({
     driverLicense: null,
     nationalId: null,
   });
@@ -46,16 +52,54 @@ const RenterProfilePage = () => {
   const handleFileChange = (e, docType) => {
     const file = e.target.files[0];
     if (file) {
+      // Validate file size (5MB)
       if (file.size > 5 * 1024 * 1024) {
-        // 5MB
-        toast.error("File không được vượt quá 5MB");
+        toast.error("File không được vượt quá 5MB", {
+          duration: 4000,
+          icon: "⚠️",
+        });
         return;
       }
+
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Chỉ chấp nhận file ảnh (JPG, PNG, etc.)", {
+          duration: 4000,
+          icon: "⚠️",
+        });
+        return;
+      }
+
       setDocuments({
         ...documents,
         [docType]: file,
       });
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviews({
+          ...previews,
+          [docType]: reader.result,
+        });
+      };
+      reader.readAsDataURL(file);
+
+      toast.success(`Đã chọn ${docType === "driverLicense" ? "Giấy phép lái xe" : "CMND/CCCD"}`, {
+        duration: 2000,
+      });
     }
+  };
+
+  const handleRemoveFile = (docType) => {
+    setDocuments({
+      ...documents,
+      [docType]: null,
+    });
+    setPreviews({
+      ...previews,
+      [docType]: null,
+    });
   };
 
   const handleUpdateProfile = async (e) => {
@@ -63,7 +107,7 @@ const RenterProfilePage = () => {
     try {
       setLoading(true);
       const response = await authService.updateProfile(formData);
-      setUser(response.data.user);
+      updateUser(response.data.user);
       toast.success("Cập nhật thông tin thành công");
     } catch (error) {
       toast.error(error.response?.data?.message || "Cập nhật thất bại");
@@ -74,7 +118,10 @@ const RenterProfilePage = () => {
 
   const handleUploadDocuments = async () => {
     if (!documents.driverLicense || !documents.nationalId) {
-      toast.error("Vui lòng chọn đầy đủ 2 giấy tờ");
+      toast.error("Vui lòng chọn đầy đủ 2 giấy tờ", {
+        duration: 4000,
+        icon: "⚠️",
+      });
       return;
     }
 
@@ -85,18 +132,34 @@ const RenterProfilePage = () => {
       formData.append("nationalId", documents.nationalId);
 
       const response = await authService.uploadDocuments(formData);
-      setUser(response.data.user);
-      toast.success("Upload giấy tờ thành công! Đang chờ xét duyệt.");
-      setDocuments({ driverLicense: null, nationalId: null });
+      
+      if (response.success) {
+        updateUser(response.data.user);
+        toast.success("Upload giấy tờ thành công! Đang chờ xét duyệt.", {
+          duration: 5000,
+          icon: "✅",
+        });
+        // Clear documents and previews
+        setDocuments({ driverLicense: null, nationalId: null });
+        setPreviews({ driverLicense: null, nationalId: null });
+      }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Upload thất bại");
+      console.error("Upload error:", error);
+      toast.error(error.response?.data?.message || "Upload thất bại. Vui lòng thử lại!", {
+        duration: 5000,
+        icon: "❌",
+      });
     } finally {
       setUploading(false);
     }
   };
 
   const getVerificationStatus = () => {
-    if (!user?.driverLicense || !user?.nationalId) {
+    // Kiểm tra chính xác xem có URL ảnh hay không
+    const hasDriverLicense = user?.driverLicense && typeof user.driverLicense === 'string' && user.driverLicense.length > 0;
+    const hasNationalId = user?.nationalId && typeof user.nationalId === 'string' && user.nationalId.length > 0;
+    
+    if (!hasDriverLicense || !hasNationalId) {
       return {
         status: "missing",
         icon: <AlertCircle className="w-5 h-5" />,
@@ -254,24 +317,48 @@ const RenterProfilePage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Giấy phép lái xe
                 </label>
-                {user?.driverLicense ? (
-                  <div className="border border-gray-300 rounded-lg p-4">
+                {user?.driverLicense && typeof user.driverLicense === 'string' && user.driverLicense.length > 0 ? (
+                  <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
                     <img
                       src={user.driverLicense}
                       alt="Driver License"
-                      className="w-full h-48 object-contain mb-2"
+                      className="w-full h-48 object-contain mb-2 rounded"
                     />
-                    <p className="text-sm text-gray-600 text-center">
+                    <div className="flex items-center justify-center text-sm text-green-600">
+                      <CheckCircle className="w-4 h-4 mr-1" />
                       Đã upload
+                    </div>
+                  </div>
+                ) : previews.driverLicense ? (
+                  <div className="border border-primary-300 rounded-lg p-4 bg-primary-50">
+                    <div className="relative">
+                      <img
+                        src={previews.driverLicense}
+                        alt="Preview"
+                        className="w-full h-48 object-contain mb-2 rounded"
+                      />
+                      <button
+                        onClick={() => handleRemoveFile("driverLicense")}
+                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-600 text-center mt-2">
+                      <ImageIcon className="w-4 h-4 inline mr-1" />
+                      {documents.driverLicense?.name}
                     </p>
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors">
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary-400 hover:bg-primary-50 transition-all cursor-pointer">
+                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
                     <label className="cursor-pointer">
-                      <span className="text-primary-600 hover:text-primary-700 font-medium">
-                        Chọn file
+                      <span className="text-primary-600 hover:text-primary-700 font-medium text-lg">
+                        Chọn ảnh Giấy phép lái xe
                       </span>
+                      <p className="text-sm text-gray-500 mt-1">
+                        PNG, JPG, JPEG (Tối đa 5MB)
+                      </p>
                       <input
                         type="file"
                         accept="image/*"
@@ -279,11 +366,6 @@ const RenterProfilePage = () => {
                         className="hidden"
                       />
                     </label>
-                    {documents.driverLicense && (
-                      <p className="text-sm text-gray-600 mt-2">
-                        {documents.driverLicense.name}
-                      </p>
-                    )}
                   </div>
                 )}
               </div>
@@ -293,24 +375,48 @@ const RenterProfilePage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   CMND/CCCD
                 </label>
-                {user?.nationalId ? (
-                  <div className="border border-gray-300 rounded-lg p-4">
+                {user?.nationalId && typeof user.nationalId === 'string' && user.nationalId.length > 0 ? (
+                  <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
                     <img
                       src={user.nationalId}
                       alt="National ID"
-                      className="w-full h-48 object-contain mb-2"
+                      className="w-full h-48 object-contain mb-2 rounded"
                     />
-                    <p className="text-sm text-gray-600 text-center">
+                    <div className="flex items-center justify-center text-sm text-green-600">
+                      <CheckCircle className="w-4 h-4 mr-1" />
                       Đã upload
+                    </div>
+                  </div>
+                ) : previews.nationalId ? (
+                  <div className="border border-primary-300 rounded-lg p-4 bg-primary-50">
+                    <div className="relative">
+                      <img
+                        src={previews.nationalId}
+                        alt="Preview"
+                        className="w-full h-48 object-contain mb-2 rounded"
+                      />
+                      <button
+                        onClick={() => handleRemoveFile("nationalId")}
+                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-600 text-center mt-2">
+                      <ImageIcon className="w-4 h-4 inline mr-1" />
+                      {documents.nationalId?.name}
                     </p>
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors">
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary-400 hover:bg-primary-50 transition-all cursor-pointer">
+                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
                     <label className="cursor-pointer">
-                      <span className="text-primary-600 hover:text-primary-700 font-medium">
-                        Chọn file
+                      <span className="text-primary-600 hover:text-primary-700 font-medium text-lg">
+                        Chọn ảnh CMND/CCCD
                       </span>
+                      <p className="text-sm text-gray-500 mt-1">
+                        PNG, JPG, JPEG (Tối đa 5MB)
+                      </p>
                       <input
                         type="file"
                         accept="image/*"
@@ -318,16 +424,13 @@ const RenterProfilePage = () => {
                         className="hidden"
                       />
                     </label>
-                    {documents.nationalId && (
-                      <p className="text-sm text-gray-600 mt-2">
-                        {documents.nationalId.name}
-                      </p>
-                    )}
                   </div>
                 )}
               </div>
 
-              {(!user?.driverLicense || !user?.nationalId) && (
+              {/* Chỉ hiển thị nút upload khi chưa có cả 2 giấy tờ */}
+              {!(user?.driverLicense && typeof user.driverLicense === 'string' && user.driverLicense.length > 0 && 
+                 user?.nationalId && typeof user.nationalId === 'string' && user.nationalId.length > 0) && (
                 <button
                   onClick={handleUploadDocuments}
                   disabled={
@@ -335,9 +438,19 @@ const RenterProfilePage = () => {
                     !documents.driverLicense ||
                     !documents.nationalId
                   }
-                  className="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {uploading ? "Đang upload..." : "Upload giấy tờ"}
+                  {uploading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Đang upload...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-5 h-5" />
+                      Upload giấy tờ
+                    </>
+                  )}
                 </button>
               )}
             </div>
