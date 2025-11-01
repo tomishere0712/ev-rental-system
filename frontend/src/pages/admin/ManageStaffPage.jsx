@@ -9,6 +9,7 @@ import {
   MapPin,
   TrendingUp,
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 const ManageStaffPage = () => {
   const [staff, setStaff] = useState([]);
@@ -36,8 +37,16 @@ const ManageStaffPage = () => {
         adminService.getAllStaff(),
         adminService.getAllStations(),
       ]);
-      setStaff(staffData);
-      setStations(stationsData);
+      console.log();
+      const staffArray =
+        staffData?.data ||
+        staffData?.staff ||
+        (Array.isArray(staffData) ? staffData : []);
+      const stationsArray =
+        stationsData?.data || (Array.isArray(stationsData) ? stationsData : []);
+
+      setStaff(Array.isArray(staffArray) ? staffArray : []);
+      setStations(Array.isArray(stationsArray) ? stationsArray : []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -56,16 +65,16 @@ const ManageStaffPage = () => {
           delete updateData.password;
         }
         await adminService.updateStaff(editingStaff._id, updateData);
-        alert("Staff updated successfully!");
+        toast.success("Staff updated successfully!");
       } else {
         await adminService.createStaff(formData);
-        alert("Staff created successfully!");
+        toast.success("Staff created successfully!");
       }
 
       fetchData();
       closeModal();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to save staff");
+      toast.error(error.response?.data?.message || "Failed to save staff");
     }
   };
 
@@ -86,10 +95,10 @@ const ManageStaffPage = () => {
 
     try {
       await adminService.deleteStaff(staffId);
-      alert("Staff deleted successfully!");
+      toast.success("Staff deleted successfully!");
       fetchData();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to delete staff");
+      toast.error(error.response?.data?.message || "Failed to delete staff");
     }
   };
 
@@ -186,89 +195,110 @@ const ManageStaffPage = () => {
         </div>
       </div>
 
-      {/* Staff Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredStaff.map((member) => (
-          <div
-            key={member._id}
-            className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
-          >
-            <div className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <UserCheck className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {member.fullName}
-                    </h3>
-                    <p className="text-sm text-gray-600">{member.email}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3 mb-4">
-                <div>
-                  <p className="text-sm text-gray-600">Phone</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {member.phone || "N/A"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Assigned Station</p>
-                  <div className="flex items-center gap-1 text-sm font-medium text-gray-900">
-                    <MapPin className="w-4 h-4 text-gray-400" />
-                    {member.assignedStation?.name || "Not assigned"}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <div>
-                    <p className="text-sm text-gray-600">Performance Score</p>
-                    <div className="flex items-center gap-1">
+      {/* Staff Table (similar to ManageUsers) */}
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Staff
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Contact
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Station
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Performance
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredStaff.map((member) => (
+                <tr key={member._id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <UserCheck className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {member.fullName}
+                        </p>
+                        <p className="text-xs text-gray-500">{member.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm text-gray-900">
+                      {member.phone || "N/A"}
+                    </p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      <span>
+                        {member.assignedStation?.name || "Not assigned"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-green-600" />
-                      <p className="text-lg font-bold text-green-600">
-                        {member.performanceScore?.toFixed(1) || "0.0"}
+                      <p className="text-sm font-semibold text-green-600">
+                        {(member.performanceScore || 0).toFixed(1)}
                       </p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600">Tasks Today</p>
-                    <p className="text-lg font-bold text-blue-600">
-                      {member.tasksCompletedToday || 0}
-                    </p>
-                  </div>
-                </div>
-                {member.isActive ? (
-                  <span className="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
-                    Active Today
-                  </span>
-                ) : (
-                  <span className="inline-block px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-semibold">
-                    Offline
-                  </span>
-                )}
-              </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {member.isActive ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                        Offline
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleEdit(member)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                        title="Edit"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(member._id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-              <div className="flex gap-2 pt-4 border-t">
-                <button
-                  onClick={() => handleEdit(member)}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
-                >
-                  <Edit className="w-4 h-4" />
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(member._id)}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center justify-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </button>
-              </div>
-            </div>
+        {filteredStaff.length === 0 && (
+          <div className="text-center py-12">
+            <UserCheck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No staff members found</p>
           </div>
-        ))}
+        )}
       </div>
 
       {filteredStaff.length === 0 && (

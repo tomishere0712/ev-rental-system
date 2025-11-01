@@ -12,11 +12,50 @@ const ManageStationsPage = () => {
     name: "",
     address: "",
     city: "",
+    code: "",
     phone: "",
     coordinates: { lat: "", lng: "" },
     operatingHours: { open: "08:00", close: "20:00" },
-    capacity: "",
+    totalParkingSpots: "",
+    chargingStations: "",
   });
+
+  const formatAddress = (addr) => {
+    if (!addr) return "N/A";
+    if (typeof addr === "string") return addr;
+    const parts = [
+      addr.street,
+      addr.ward,
+      addr.district,
+      addr.city,
+      addr.country,
+    ];
+    return parts.filter(Boolean).join(", ");
+  };
+
+  const formatOperatingHours = (oh) => {
+    if (!oh) return "N/A";
+    // shape 1: { open, close }
+    if (oh.open && oh.close) return `${oh.open} - ${oh.close}`;
+
+    // shape 2: per-day object: pick monday or first available day
+    const days = [
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+      "sunday",
+    ];
+    for (const d of days) {
+      if (oh[d] && (oh[d].open || oh[d].close)) {
+        return `${oh[d].open || ""} - ${oh[d].close || ""}`;
+      }
+    }
+
+    return "N/A";
+  };
 
   useEffect(() => {
     fetchStations();
@@ -25,8 +64,12 @@ const ManageStationsPage = () => {
   const fetchStations = async () => {
     try {
       setLoading(true);
-      const data = await adminService.getAllStations();
-      setStations(data);
+      const res = await adminService.getAllStations();
+      // backend returns { success: true, data: [...] }
+      const stationsArray =
+        res?.data || res?.stations || (Array.isArray(res) ? res : []);
+
+      setStations(Array.isArray(stationsArray) ? stationsArray : []);
     } catch (error) {
       console.error("Error fetching stations:", error);
     } finally {
@@ -38,12 +81,20 @@ const ManageStationsPage = () => {
     e.preventDefault();
 
     const payload = {
-      ...formData,
+      name: formData.name,
+      code: formData.code,
+      phone: formData.phone,
+      address: {
+        street: formData.address,
+        city: formData.city,
+      },
       coordinates: {
         lat: parseFloat(formData.coordinates.lat),
         lng: parseFloat(formData.coordinates.lng),
       },
-      capacity: parseInt(formData.capacity),
+      operatingHours: formData.operatingHours,
+      totalParkingSpots: parseInt(formData.totalParkingSpots),
+      chargingStations: parseInt(formData.chargingStations),
     };
 
     try {
@@ -66,15 +117,22 @@ const ManageStationsPage = () => {
     setEditingStation(station);
     setFormData({
       name: station.name,
-      address: station.address,
-      city: station.city,
+      // station.address may be an object: map to form fields
+      address: station.address?.street || "",
+      city: station.address?.city || "",
+      code: station.code || "",
       phone: station.phone,
       coordinates: {
-        lat: station.coordinates.lat.toString(),
-        lng: station.coordinates.lng.toString(),
+        lat: station.coordinates?.lat?.toString() || "",
+        lng: station.coordinates?.lng?.toString() || "",
       },
       operatingHours: station.operatingHours,
-      capacity: station.capacity.toString(),
+      totalParkingSpots: (
+        station.totalParkingSpots ||
+        station.capacity ||
+        ""
+      ).toString(),
+      chargingStations: (station.chargingStations || "").toString(),
     });
     setShowModal(true);
   };
@@ -98,19 +156,25 @@ const ManageStationsPage = () => {
       name: "",
       address: "",
       city: "",
+      code: "",
       phone: "",
       coordinates: { lat: "", lng: "" },
       operatingHours: { open: "08:00", close: "20:00" },
-      capacity: "",
+      totalParkingSpots: "",
+      chargingStations: "",
     });
   };
 
-  const filteredStations = stations.filter(
-    (station) =>
-      station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      station.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      station.address.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredStations = stations.filter((station) => {
+    const q = searchQuery.toLowerCase();
+    const nameMatches = station.name?.toLowerCase().includes(q);
+    const cityMatches = station.address?.city
+      ? station.address.city.toLowerCase().includes(q)
+      : false;
+    const addressStr = formatAddress(station.address).toLowerCase();
+    const addressMatches = addressStr.includes(q);
+    return nameMatches || cityMatches || addressMatches;
+  });
 
   if (loading) {
     return (
@@ -178,7 +242,7 @@ const ManageStationsPage = () => {
                 <div>
                   <p className="text-sm text-gray-600">Address</p>
                   <p className="text-sm font-medium text-gray-900">
-                    {station.address}
+                    {formatAddress(station.address)}
                   </p>
                 </div>
                 <div>
@@ -190,15 +254,15 @@ const ManageStationsPage = () => {
                 <div>
                   <p className="text-sm text-gray-600">Operating Hours</p>
                   <p className="text-sm font-medium text-gray-900">
-                    {station.operatingHours.open} -{" "}
-                    {station.operatingHours.close}
+                    {formatOperatingHours(station.operatingHours)}
                   </p>
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t">
                   <div>
-                    <p className="text-sm text-gray-600">Capacity</p>
+                    <p className="text-sm text-gray-600">Total Parking Spots</p>
                     <p className="text-lg font-bold text-blue-600">
-                      {station.capacity} vehicles
+                      {station.totalParkingSpots ?? station.capacity ?? 0}{" "}
+                      vehicles
                     </p>
                   </div>
                   <div>
@@ -230,13 +294,6 @@ const ManageStationsPage = () => {
           </div>
         ))}
       </div>
-
-      {filteredStations.length === 0 && (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
-          <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No stations found</p>
-        </div>
-      )}
 
       {/* Add/Edit Modal */}
       {showModal && (
@@ -288,6 +345,21 @@ const ManageStationsPage = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Station Code *
+                </label>
+                <input
+                  type="text"
+                  value={formData.code}
+                  onChange={(e) =>
+                    setFormData({ ...formData, code: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Address *
                 </label>
                 <input
@@ -318,18 +390,39 @@ const ManageStationsPage = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Capacity *
+                    Total Parking Spots *
                   </label>
                   <input
                     type="number"
-                    value={formData.capacity}
+                    value={formData.totalParkingSpots}
                     onChange={(e) =>
-                      setFormData({ ...formData, capacity: e.target.value })
+                      setFormData({
+                        ...formData,
+                        totalParkingSpots: e.target.value,
+                      })
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Charging Stations *
+                </label>
+                <input
+                  type="number"
+                  value={formData.chargingStations}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      chargingStations: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
