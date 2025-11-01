@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { bookingService } from "../../services";
+import VerificationAlert from "../../components/VerificationAlert";
 import {
   Calendar,
   Car,
@@ -135,6 +136,9 @@ const MyBookingsPage = () => {
           Quản lý và theo dõi các chuyến thuê xe của bạn
         </p>
       </div>
+
+      {/* Verification Alert */}
+      <VerificationAlert />
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">

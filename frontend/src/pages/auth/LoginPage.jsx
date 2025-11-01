@@ -35,23 +35,16 @@ const LoginPage = () => {
 
       if (response.success) {
         const { token, ...user } = response.data;
+        console.log("Login response user data:", user);
+        console.log("User verificationStatus:", user.verificationStatus);
+        console.log("User driverLicense:", user.driverLicense);
+        console.log("User nationalId:", user.nationalId);
+        
         setAuth(user, token);
         toast.success("Đăng nhập thành công!");
 
-        // Redirect based on role
-        switch (user.role) {
-          case "renter":
-            navigate("/renter/dashboard");
-            break;
-          case "staff":
-            navigate("/staff/dashboard");
-            break;
-          case "admin":
-            navigate("/admin/dashboard");
-            break;
-          default:
-            navigate("/");
-        }
+        // Redirect to homepage for all users
+        navigate("/");
       }
     } catch (error) {
       toast.error(error.response?.data?.message || "Đăng nhập thất bại");

@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
 
 // Generate JWT Token
 const generateToken = (id, role) => {
@@ -16,10 +17,18 @@ exports.register = async (req, res) => {
   try {
     const { email, password, fullName, phone, role } = req.body;
 
-    // Check if user exists
-    const userExists = await User.findOne({ email });
-    if (userExists) {
+    // Check if email exists
+    const emailExists = await User.findOne({ email });
+    if (emailExists) {
       return res.status(400).json({ message: "Email đã được sử dụng" });
+    }
+
+    // Check if phone exists
+    if (phone) {
+      const phoneExists = await User.findOne({ phone });
+      if (phoneExists) {
+        return res.status(400).json({ message: "Số điện thoại đã được sử dụng" });
+      }
     }
 
     // Create user
@@ -43,6 +52,7 @@ exports.register = async (req, res) => {
         phone: user.phone,
         role: user.role,
         isVerified: user.isVerified,
+        verificationStatus: user.verificationStatus,
         token,
       },
     });
@@ -101,6 +111,8 @@ exports.login = async (req, res) => {
         isVerified: user.isVerified,
         driverLicense: user.driverLicense,
         nationalId: user.nationalId,
+        verificationStatus: user.verificationStatus,
+        verificationNote: user.verificationNote,
         token,
       },
     });
@@ -142,7 +154,18 @@ exports.uploadDocuments = async (req, res) => {
 
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(404).json({ message: "Người dùng không tồn tại" });
+      return res.status(404).json({ 
+        success: false,
+        message: "Người dùng không tồn tại" 
+      });
+    }
+
+    // Kiểm tra nếu đang pending thì không cho upload lại
+    if (user.verificationStatus === "pending") {
+      return res.status(400).json({ 
+        success: false,
+        message: "Hồ sơ đang được xét duyệt. Vui lòng chờ kết quả." 
+      });
     }
 
     // Upload driver license images to Cloudinary
@@ -155,12 +178,16 @@ exports.uploadDocuments = async (req, res) => {
       for (const file of files) {
         const result = await cloudinary.uploader.upload(file.path, {
           folder: "ev-rental/driver-licenses",
+          resource_type: "image",
         });
         driverLicenseImages.push(result.secure_url);
+        
+        // Delete temporary file
+        fs.unlinkSync(file.path);
       }
 
       user.driverLicense = {
-        number: driverLicenseNumber,
+        number: req.body.driverLicenseNumber || "",
         images: driverLicenseImages,
         verified: false,
       };
@@ -176,16 +203,24 @@ exports.uploadDocuments = async (req, res) => {
       for (const file of files) {
         const result = await cloudinary.uploader.upload(file.path, {
           folder: "ev-rental/national-ids",
+          resource_type: "image",
         });
         nationalIdImages.push(result.secure_url);
+        
+        // Delete temporary file
+        fs.unlinkSync(file.path);
       }
 
       user.nationalId = {
-        number: nationalIdNumber,
+        number: req.body.nationalIdNumber || "",
         images: nationalIdImages,
         verified: false,
       };
     }
+
+    // Set verification status to pending
+    user.verificationStatus = "pending";
+    user.verificationNote = "";
 
     await user.save();
 
@@ -198,7 +233,11 @@ exports.uploadDocuments = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Upload documents error:", error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 

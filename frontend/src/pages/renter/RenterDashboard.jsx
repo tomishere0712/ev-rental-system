@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import { bookingService } from "../../services";
+import VerificationAlert from "../../components/VerificationAlert";
 import {
   Car,
   Calendar,
@@ -119,27 +120,7 @@ const RenterDashboard = () => {
       </div>
 
       {/* Verification Alert */}
-      {!user?.isVerified && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-          <div className="flex">
-            <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 mr-3 flex-shrink-0" />
-            <div>
-              <h3 className="text-sm font-medium text-yellow-800 mb-1">
-                Tài khoản chưa được xác thực
-              </h3>
-              <p className="text-sm text-yellow-700 mb-2">
-                Bạn cần upload Giấy phép lái xe và CMND/CCCD để có thể đặt xe.
-              </p>
-              <Link
-                to="/renter/profile"
-                className="text-sm font-medium text-yellow-800 hover:text-yellow-900 underline"
-              >
-                Xác thực ngay →
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      <VerificationAlert />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

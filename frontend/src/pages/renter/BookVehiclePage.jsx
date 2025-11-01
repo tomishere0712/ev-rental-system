@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import { vehicleService, stationService, bookingService } from "../../services";
+import VerificationAlert from "../../components/VerificationAlert";
 import {
   Car,
   MapPin,
@@ -196,27 +197,7 @@ const BookVehiclePage = () => {
       </div>
 
       {/* Verification Alert */}
-      {!user?.isVerified && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-          <div className="flex">
-            <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 mr-3 flex-shrink-0" />
-            <div>
-              <h3 className="text-sm font-medium text-yellow-800 mb-1">
-                Yêu cầu xác thực tài khoản
-              </h3>
-              <p className="text-sm text-yellow-700 mb-2">
-                Bạn cần upload và xác thực giấy tờ trước khi có thể đặt xe.
-              </p>
-              <button
-                onClick={() => navigate("/renter/profile")}
-                className="text-sm font-medium text-yellow-800 hover:text-yellow-900 underline"
-              >
-                Xác thực ngay →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <VerificationAlert />
 
       {/* Progress Steps */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">

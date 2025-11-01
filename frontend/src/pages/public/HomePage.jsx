@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
-import { Car, MapPin, Shield, Clock, Battery, Zap, Search } from "lucide-react";
+import { Car, MapPin, Shield, Clock, Battery, Zap, Search, AlertCircle, ArrowRight } from "lucide-react";
 import { useState } from "react";
+import { useAuthStore } from "../../store/authStore";
 
 const HomePage = () => {
+  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
 
   const features = [
@@ -50,6 +52,98 @@ const HomePage = () => {
 
   return (
     <div className="bg-white">
+      {/* Verification Alert Banner */}
+      {user && user.role === "renter" && (
+        <>
+          {/* Chưa upload giấy tờ */}
+          {(!user.verificationStatus || user.verificationStatus === "none") && (
+            <div className="bg-yellow-50 border-b-2 border-yellow-400">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-start gap-3 flex-1">
+                    <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="text-yellow-900 font-semibold text-lg mb-1">
+                        Tài khoản chưa được xác thực
+                      </h3>
+                      <p className="text-yellow-800 text-sm">
+                        Vui lòng upload <strong>Giấy phép lái xe</strong> và <strong>CMND/CCCD</strong> để có thể đặt xe và sử dụng đầy đủ dịch vụ.
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    to="/renter/profile"
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors flex items-center gap-2 whitespace-nowrap"
+                  >
+                    Xác thực ngay
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Đang chờ xét duyệt */}
+          {user.verificationStatus === "pending" && (
+            <div className="bg-blue-50 border-b-2 border-blue-400">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-start gap-3 flex-1">
+                    <Clock className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="text-blue-900 font-semibold text-lg mb-1">
+                        Hồ sơ đang được xét duyệt
+                      </h3>
+                      <p className="text-blue-800 text-sm">
+                        Chúng tôi đang xem xét hồ sơ của bạn. Quá trình này có thể mất <strong>24-48 giờ</strong>. Bạn sẽ nhận được thông báo khi có kết quả.
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    to="/renter/profile"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors flex items-center gap-2 whitespace-nowrap"
+                  >
+                    Xem chi tiết
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bị từ chối */}
+          {user.verificationStatus === "rejected" && (
+            <div className="bg-red-50 border-b-2 border-red-400">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-start gap-3 flex-1">
+                    <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="text-red-900 font-semibold text-lg mb-1">
+                        Hồ sơ xác thực bị từ chối
+                      </h3>
+                      <p className="text-red-800 text-sm mb-2">
+                        {user.verificationNote || "Giấy tờ không hợp lệ hoặc không rõ ràng. Vui lòng upload lại."}
+                      </p>
+                      <p className="text-red-700 text-sm font-medium">
+                        Vui lòng kiểm tra và upload lại giấy tờ hợp lệ.
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    to="/renter/profile"
+                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors flex items-center gap-2 whitespace-nowrap"
+                  >
+                    Upload lại
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-primary-600 to-primary-800 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">

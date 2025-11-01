@@ -38,16 +38,43 @@ const userSchema = new mongoose.Schema(
 
     // For Renters - Verification Documents
     driverLicense: {
-      number: String,
-      images: [String],
-      verified: { type: Boolean, default: false },
-      verifiedAt: Date,
-      verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      number: {
+        type: String,
+        default: "",
+      },
+      images: {
+        type: [String],
+        default: [],
+      },
+      verified: {
+        type: Boolean,
+        default: false,
+      },
     },
     nationalId: {
-      number: String,
-      images: [String],
-      verified: { type: Boolean, default: false },
+      number: {
+        type: String,
+        default: "",
+      },
+      images: {
+        type: [String],
+        default: [],
+      },
+      verified: {
+        type: Boolean,
+        default: false,
+      },
+    },
+
+    // Verification Status
+    verificationStatus: {
+      type: String,
+      enum: ["none", "pending", "approved", "rejected"],
+      default: "none",
+    },
+    verificationNote: {
+      type: String,
+      default: "",
     },
 
     // For Staff - Station Assignment

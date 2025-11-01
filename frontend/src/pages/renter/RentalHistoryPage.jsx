@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { bookingService } from "../../services";
+import VerificationAlert from "../../components/VerificationAlert";
 import {
   Calendar,
   Car,
@@ -76,6 +77,9 @@ const RentalHistoryPage = () => {
           Xem lại các chuyến đã hoàn thành và thống kê chi tiêu
         </p>
       </div>
+
+      {/* Verification Alert */}
+      <VerificationAlert />
 
       {/* Time Range Filter */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
