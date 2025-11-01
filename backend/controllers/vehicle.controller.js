@@ -43,12 +43,11 @@ exports.getVehicles = async (req, res) => {
 
     res.json({
       success: true,
-      data: vehicles,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
+      data: {
+        vehicles,
         total,
-        pages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limit),
+        currentPage: Number(page),
       },
     });
   } catch (error) {
