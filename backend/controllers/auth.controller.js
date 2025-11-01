@@ -146,10 +146,11 @@ exports.getMe = async (req, res) => {
 // @access  Private (Renter)
 exports.uploadDocuments = async (req, res) => {
   try {
-    const { driverLicenseNumber, nationalIdNumber } = req.body;
-
     if (!req.files || (!req.files.driverLicense && !req.files.nationalId)) {
-      return res.status(400).json({ message: "Vui lòng upload giấy tờ" });
+      return res.status(400).json({ 
+        success: false,
+        message: "Vui lòng upload đầy đủ 2 giấy tờ" 
+      });
     }
 
     const user = await User.findById(req.user.id);
@@ -168,7 +169,7 @@ exports.uploadDocuments = async (req, res) => {
       });
     }
 
-    // Upload driver license images to Cloudinary
+    // Upload driver license to Cloudinary
     if (req.files.driverLicense) {
       const driverLicenseImages = [];
       const files = Array.isArray(req.files.driverLicense)
@@ -193,7 +194,7 @@ exports.uploadDocuments = async (req, res) => {
       };
     }
 
-    // Upload national ID images to Cloudinary
+    // Upload national ID to Cloudinary
     if (req.files.nationalId) {
       const nationalIdImages = [];
       const files = Array.isArray(req.files.nationalId)
@@ -224,12 +225,14 @@ exports.uploadDocuments = async (req, res) => {
 
     await user.save();
 
+    // Return updated user without password
+    const updatedUser = await User.findById(user._id).select("-password");
+
     res.json({
       success: true,
-      message: "Upload giấy tờ thành công. Chờ nhân viên xác thực.",
+      message: "Upload giấy tờ thành công! Đang chờ xét duyệt.",
       data: {
-        driverLicense: user.driverLicense,
-        nationalId: user.nationalId,
+        user: updatedUser,
       },
     });
   } catch (error) {

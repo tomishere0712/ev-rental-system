@@ -9,11 +9,13 @@ import {
   CheckCircle,
   AlertCircle,
   Save,
+  X,
+  Image as ImageIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 const RenterProfilePage = () => {
-  const { user, setUser } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
@@ -72,11 +74,24 @@ const RenterProfilePage = () => {
   const handleFileChange = (e, docType) => {
     const file = e.target.files[0];
     if (file) {
+      // Validate file size (5MB)
       if (file.size > 5 * 1024 * 1024) {
-        // 5MB
-        toast.error("File không được vượt quá 5MB");
+        toast.error("File không được vượt quá 5MB", {
+          duration: 4000,
+          icon: "⚠️",
+        });
         return;
       }
+
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Chỉ chấp nhận file ảnh (JPG, PNG, etc.)", {
+          duration: 4000,
+          icon: "⚠️",
+        });
+        return;
+      }
+
       setDocuments({
         ...documents,
         [docType]: file,
@@ -117,12 +132,23 @@ const RenterProfilePage = () => {
     });
   };
 
+  const handleRemoveFile = (docType) => {
+    setDocuments({
+      ...documents,
+      [docType]: null,
+    });
+    setPreviews({
+      ...previews,
+      [docType]: null,
+    });
+  };
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
       const response = await authService.updateProfile(formData);
-      setUser(response.data.user);
+      updateUser(response.data.user);
       toast.success("Cập nhật thông tin thành công");
     } catch (error) {
       toast.error(error.response?.data?.message || "Cập nhật thất bại");
@@ -178,7 +204,11 @@ const RenterProfilePage = () => {
         setPreviews({ driverLicense: null, nationalId: null });
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Upload thất bại");
+      console.error("Upload error:", error);
+      toast.error(error.response?.data?.message || "Upload thất bại. Vui lòng thử lại!", {
+        duration: 5000,
+        icon: "❌",
+      });
     } finally {
       setUploading(false);
     }
@@ -446,12 +476,15 @@ const RenterProfilePage = () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors">
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary-400 hover:bg-primary-50 transition-all cursor-pointer">
+                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
                     <label className="cursor-pointer">
-                      <span className="text-primary-600 hover:text-primary-700 font-medium">
-                        Chọn file
+                      <span className="text-primary-600 hover:text-primary-700 font-medium text-lg">
+                        Chọn ảnh Giấy phép lái xe
                       </span>
+                      <p className="text-sm text-gray-500 mt-1">
+                        PNG, JPG, JPEG (Tối đa 5MB)
+                      </p>
                       <input
                         type="file"
                         accept="image/*"
@@ -521,12 +554,15 @@ const RenterProfilePage = () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors">
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary-400 hover:bg-primary-50 transition-all cursor-pointer">
+                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
                     <label className="cursor-pointer">
                       <span className="text-primary-600 hover:text-primary-700 font-medium">
                         {user?.nationalId?.images && user.nationalId.images.length > 0 ? "Chọn file mới" : "Chọn file"}
                       </span>
+                      <p className="text-sm text-gray-500 mt-1">
+                        PNG, JPG, JPEG (Tối đa 5MB)
+                      </p>
                       <input
                         type="file"
                         accept="image/*"

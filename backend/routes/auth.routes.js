@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { protect, authorize } = require("../middleware/auth");
+const upload = require("../middleware/upload");
 const {
   register,
   login,
@@ -27,7 +28,16 @@ router.get("/me", protect, getMe);
 // @route   POST /api/auth/upload-documents
 // @desc    Upload and verify driver license & national ID
 // @access  Private (Renter)
-router.post("/upload-documents", protect, authorize("renter"), uploadDocuments);
+router.post(
+  "/upload-documents",
+  protect,
+  authorize("renter"),
+  upload.fields([
+    { name: "driverLicense", maxCount: 2 },
+    { name: "nationalId", maxCount: 2 },
+  ]),
+  uploadDocuments
+);
 
 // @route   PUT /api/auth/profile
 // @desc    Update user profile
