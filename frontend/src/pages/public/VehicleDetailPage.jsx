@@ -243,7 +243,7 @@ const VehicleDetailPage = () => {
                 </h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Dung lượng pin</span>
+                    <span className="text-gray-600">Điện năng tiêu thụ</span>
                     <span className="font-medium text-gray-900">
                       {vehicle.batteryCapacity} kWh
                     </span>

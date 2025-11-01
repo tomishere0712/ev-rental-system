@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Search, Filter, Battery, MapPin, Car } from "lucide-react";
-import { vehicleService } from "../../services";
+import { vehicleService, stationService } from "../../services";
 import toast from "react-hot-toast";
 
 const VehiclesPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [vehicles, setVehicles] = useState([]);
+  const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",
@@ -23,16 +24,38 @@ const VehiclesPage = () => {
     totalPages: 0,
   });
 
-  const vehicleTypes = ["Scooter", "Motorcycle", "Car", "Bike"];
+  const vehicleTypes = ["scooter", "motorcycle", "car", "bike"];
+
+  // Fetch stations on mount
+  useEffect(() => {
+    const fetchStations = async () => {
+      try {
+        const response = await stationService.getStations();
+        setStations(response.data.stations || response.data || []);
+      } catch (error) {
+        console.error("Không thể tải danh sách điểm thuê:", error);
+      }
+    };
+    fetchStations();
+  }, []);
 
   const fetchVehicles = async () => {
     try {
       setLoading(true);
+      
+      // Build clean params object, removing empty values
       const params = {
         page: pagination.page,
         limit: pagination.limit,
-        ...filters,
       };
+
+      // Only add filter params if they have values
+      if (filters.search) params.search = filters.search;
+      if (filters.type) params.type = filters.type;
+      if (filters.minPrice) params.minPrice = filters.minPrice;
+      if (filters.maxPrice) params.maxPrice = filters.maxPrice;
+      if (filters.minBattery) params.minBattery = filters.minBattery;
+      if (filters.station) params.station = filters.station;
 
       const response = await vehicleService.getVehicles(params);
       setVehicles(response.data.vehicles);
@@ -52,7 +75,7 @@ const VehiclesPage = () => {
   useEffect(() => {
     fetchVehicles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, filters]);
+  }, [pagination.page]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -79,6 +102,12 @@ const VehiclesPage = () => {
     });
     setSearchParams({});
     setPagination((prev) => ({ ...prev, page: 1 }));
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter") {
+      fetchVehicles();
+    }
   };
 
   return (
@@ -124,6 +153,7 @@ const VehiclesPage = () => {
                     onChange={(e) =>
                       handleFilterChange("search", e.target.value)
                     }
+                    onKeyPress={handleKeyPress}
                     placeholder="Tên xe, model..."
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
@@ -161,6 +191,7 @@ const VehiclesPage = () => {
                     onChange={(e) =>
                       handleFilterChange("minPrice", e.target.value)
                     }
+                    onKeyPress={handleKeyPress}
                     placeholder="Từ"
                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
@@ -170,6 +201,7 @@ const VehiclesPage = () => {
                     onChange={(e) =>
                       handleFilterChange("maxPrice", e.target.value)
                     }
+                    onKeyPress={handleKeyPress}
                     placeholder="Đến"
                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
@@ -179,6 +211,7 @@ const VehiclesPage = () => {
               {/* Battery */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Battery className="w-4 h-4 inline mr-1" />
                   Pin tối thiểu (%)
                 </label>
                 <input
@@ -187,11 +220,32 @@ const VehiclesPage = () => {
                   onChange={(e) =>
                     handleFilterChange("minBattery", e.target.value)
                   }
+                  onKeyPress={handleKeyPress}
                   placeholder="0-100"
                   min="0"
                   max="100"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
+              </div>
+
+              {/* Station */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <MapPin className="w-4 h-4 inline mr-1" />
+                  Điểm thuê
+                </label>
+                <select
+                  value={filters.station}
+                  onChange={(e) => handleFilterChange("station", e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="">Tất cả điểm thuê</option>
+                  {stations.map((station) => (
+                    <option key={station._id} value={station._id}>
+                      {station.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <button
@@ -292,7 +346,7 @@ const VehiclesPage = () => {
                           <div className="flex items-center text-sm text-gray-600">
                             <Battery className="w-4 h-4 mr-2 text-primary-600" />
                             <span>
-                              Pin: {vehicle.batteryCapacity}% • {vehicle.range}
+                              Pin: {vehicle.currentBatteryLevel}% • {vehicle.range}
                               km
                             </span>
                           </div>
