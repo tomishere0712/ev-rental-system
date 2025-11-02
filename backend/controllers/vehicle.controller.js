@@ -23,11 +23,11 @@ exports.getVehicles = async (req, res) => {
 
     if (station) filter.currentStation = station;
     if (type) filter.type = type;
-    
+
     // Status filter
     if (status) {
       // Support 'all' to show all vehicles regardless of status (for staff/admin)
-      if (status !== 'all') {
+      if (status !== "all") {
         filter.status = status;
       }
       // If status = 'all', don't add status filter
