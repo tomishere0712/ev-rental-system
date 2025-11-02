@@ -16,6 +16,11 @@ router.get(
   "/stats/vehicle-distribution",
   adminController.getVehicleDistribution
 );
+router.get(
+  "/stats/vehicle-usage-by-hour",
+  adminController.getVehicleUsageByHour
+);
+router.get("/stats/recent-bookings", adminController.getRecentBookings);
 
 // Vehicles Management
 router.get("/vehicles", adminController.getAllVehicles);

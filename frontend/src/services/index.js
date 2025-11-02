@@ -188,9 +188,10 @@ export const staffService = {
   },
 
   getVehicles: async (params = {}) => {
-    const queryString = Object.keys(params).length > 0 
-      ? `?${new URLSearchParams(params).toString()}`
-      : '';
+    const queryString =
+      Object.keys(params).length > 0
+        ? `?${new URLSearchParams(params).toString()}`
+        : "";
     const response = await api.get(`/staff/vehicles${queryString}`);
     return response.data;
   },
@@ -240,6 +241,13 @@ export const staffService = {
     return response.data;
   },
 
+  reconsiderVerification: async (userId, data) => {
+    const response = await api.patch(
+      `/staff/verifications/${userId}/reconsider`,
+      data
+    );
+    return response.data;
+  },
 };
 
 // Admin Services
@@ -250,13 +258,21 @@ export const adminService = {
     return response.data;
   },
 
-  getRevenueByStation: async () => {
-    const response = await api.get("/admin/stats/revenue-by-station");
+  getRevenueByStation: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get("/admin/stats/revenue-by-station", {
+      params,
+    });
     return response.data;
   },
 
-  getBookingsTrend: async () => {
-    const response = await api.get("/admin/stats/bookings-trend");
+  getBookingsTrend: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get("/admin/stats/bookings-trend", { params });
     return response.data;
   },
 
@@ -265,8 +281,25 @@ export const adminService = {
     return response.data;
   },
 
+  getVehicleUsageByHour: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get("/admin/stats/vehicle-usage-by-hour", {
+      params,
+    });
+    return response.data;
+  },
+
+  getRecentBookings: async (limit = 10) => {
+    const response = await api.get(
+      `/admin/stats/recent-bookings?limit=${limit}`
+    );
+    return response.data;
+  },
+
   // Vehicles
-  getVehicles: async (params) => {
+  getAllVehicles: async (params) => {
     const response = await api.get("/admin/vehicles", { params });
     return response.data;
   },
@@ -352,7 +385,9 @@ export const adminService = {
   },
 
   assignStaffToStation: async (staffId, stationId) => {
-    const response = await api.put(`/admin/staff/${staffId}/assign-station`, { stationId });
+    const response = await api.put(`/admin/staff/${staffId}/assign-station`, {
+      stationId,
+    });
     return response.data;
   },
 

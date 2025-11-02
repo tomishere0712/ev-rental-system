@@ -74,33 +74,75 @@ exports.getOverviewStats = async (req, res) => {
   }
 };
 
-// @desc    Get revenue by station
-// @route   GET /api/admin/stats/revenue-by-station
+// @desc    Get vehicle usage by hour (for peak hour analysis)
+// @route   GET /api/admin/stats/vehicle-usage-by-hour?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 // @access  Private/Admin
-exports.getRevenueByStation = async (req, res) => {
+exports.getVehicleUsageByHour = async (req, res) => {
   try {
-    const payments = await Payment.find({
-      paymentStatus: "completed",
-    }).populate({
-      path: "bookingId",
-      populate: { path: "pickupStation", select: "name code" },
+    const { startDate, endDate } = req.query;
+
+    // Build date filter - default to last 7 days if not provided
+    let dateFilter = {};
+    if (startDate || endDate) {
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        dateFilter.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.$lte = end;
+      }
+    } else {
+      // Default: last 7 days
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      dateFilter.$gte = sevenDaysAgo;
+    }
+
+    // Get bookings with pickup time
+    const bookings = await Booking.find({
+      createdAt: dateFilter,
+      status: { $in: ["picked-up", "completed"] }, // Only completed bookings
     });
 
-    const revenueMap = {};
+    // Group by hour of day (0-23)
+    const hourMap = {};
+    for (let i = 0; i < 24; i++) {
+      hourMap[i] = {
+        hour: i,
+        count: 0,
+        vehicles: new Set(), // Track unique vehicles
+        avgDuration: 0,
+        totalDuration: 0,
+      };
+    }
 
-    payments.forEach((payment) => {
-      if (payment.bookingId && payment.bookingId.pickupStation) {
-        const stationName = payment.bookingId.pickupStation.name;
-        if (!revenueMap[stationName]) {
-          revenueMap[stationName] = 0;
-        }
-        revenueMap[stationName] += payment.amount;
+    bookings.forEach((booking) => {
+      const hour = new Date(booking.createdAt).getHours();
+      hourMap[hour].count += 1;
+
+      if (booking.vehicleId) {
+        hourMap[hour].vehicles.add(booking.vehicleId.toString());
+      }
+
+      // Calculate booking duration if available
+      if (booking.pickupTime && booking.returnTime) {
+        const duration =
+          (new Date(booking.returnTime) - new Date(booking.pickupTime)) /
+          (1000 * 60 * 60); // in hours
+        hourMap[hour].totalDuration += duration;
       }
     });
 
-    const data = Object.keys(revenueMap).map((name) => ({
-      station: name,
-      revenue: revenueMap[name],
+    // Convert to array and calculate averages
+    const data = Object.values(hourMap).map((item) => ({
+      hour: item.hour,
+      bookings: item.count,
+      uniqueVehicles: item.vehicles.size,
+      avgDuration:
+        item.count > 0 ? (item.totalDuration / item.count).toFixed(2) : 0,
     }));
 
     res.json({
@@ -112,16 +154,95 @@ exports.getRevenueByStation = async (req, res) => {
   }
 };
 
-// @desc    Get bookings trend (last 30 days)
-// @route   GET /api/admin/stats/bookings-trend
+// @desc    Get revenue by station
+// @route   GET /api/admin/stats/revenue-by-station?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+// @access  Private/Admin
+exports.getRevenueByStation = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Build date filter
+    const dateFilter = {};
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      dateFilter.$gte = start;
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.$lte = end;
+    }
+
+    const paymentFilter = {
+      paymentStatus: "completed",
+    };
+    if (Object.keys(dateFilter).length > 0) {
+      paymentFilter.createdAt = dateFilter;
+    }
+
+    const payments = await Payment.find(paymentFilter).populate({
+      path: "bookingId",
+      populate: { path: "pickupStation", select: "name code" },
+    });
+
+    const revenueMap = {};
+
+    payments.forEach((payment) => {
+      if (payment.bookingId && payment.bookingId.pickupStation) {
+        const stationName = payment.bookingId.pickupStation.name;
+        if (!revenueMap[stationName]) {
+          revenueMap[stationName] = { revenue: 0, bookings: 0 };
+        }
+        revenueMap[stationName].revenue += payment.amount;
+        revenueMap[stationName].bookings += 1;
+      }
+    });
+
+    const data = Object.keys(revenueMap).map((name) => ({
+      station: name,
+      revenue: revenueMap[name].revenue,
+      bookings: revenueMap[name].bookings,
+    }));
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get bookings trend
+// @route   GET /api/admin/stats/bookings-trend?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 // @access  Private/Admin
 exports.getBookingsTrend = async (req, res) => {
   try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const { startDate, endDate } = req.query;
+
+    // Build date filter - default to last 30 days if not provided
+    let dateFilter = {};
+    if (startDate || endDate) {
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        dateFilter.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.$lte = end;
+      }
+    } else {
+      // Default: last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      dateFilter.$gte = thirtyDaysAgo;
+    }
 
     const bookings = await Booking.find({
-      createdAt: { $gte: thirtyDaysAgo },
+      createdAt: dateFilter,
     });
 
     // Group by date
@@ -167,6 +288,37 @@ exports.getVehicleDistribution = async (req, res) => {
     const data = distribution.map((item) => ({
       status: item._id,
       count: item.count,
+    }));
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get recent bookings
+// @route   GET /api/admin/stats/recent-bookings
+// @access  Private/Admin
+exports.getRecentBookings = async (req, res) => {
+  try {
+    const limit = req.query.limit || 10;
+
+    const bookings = await Booking.find()
+      .populate("userId", "fullName email")
+      .populate("vehicleId", "brand model name")
+      .sort({ createdAt: -1 })
+      .limit(Number(limit));
+
+    const data = bookings.map((booking) => ({
+      _id: booking._id,
+      bookingNumber: booking.bookingNumber,
+      user: booking.userId,
+      vehicle: booking.vehicleId,
+      totalAmount: booking.totalAmount,
+      status: booking.status,
     }));
 
     res.json({
@@ -734,17 +886,17 @@ exports.getStaffPerformance = async (req, res) => {
     exports.assignStaffToStation = async (req, res) => {
       try {
         const { stationId } = req.body;
-    
+
         if (!stationId) {
           return res.status(400).json({ message: "Vui lòng chọn trạm" });
         }
-    
+
         // Verify station exists
         const station = await Station.findById(stationId);
         if (!station) {
           return res.status(404).json({ message: "Không tìm thấy trạm" });
         }
-    
+
         // Update staff's assigned station
         const staff = await User.findByIdAndUpdate(
           req.params.id,
@@ -753,11 +905,11 @@ exports.getStaffPerformance = async (req, res) => {
         )
           .select("-password")
           .populate("assignedStation");
-    
+
         if (!staff || staff.role !== "staff") {
           return res.status(404).json({ message: "Không tìm thấy nhân viên" });
         }
-    
+
         res.json({
           success: true,
           data: staff,

@@ -1,10 +1,15 @@
-import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
-import { adminService } from '../../services';
+import { useState, useEffect } from "react";
+import PropTypes from "prop-types";
+import { adminService } from "../../services";
 
-const AssignStationModal = ({ staff, isOpen, onClose, onAssign }) => {
+const AssignStationModal = ({
+  staff = null,
+  isOpen,
+  onClose,
+  onAssign = () => {},
+}) => {
   const [stations, setStations] = useState([]);
-  const [selectedStation, setSelectedStation] = useState('');
+  const [selectedStation, setSelectedStation] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -14,15 +19,15 @@ const AssignStationModal = ({ staff, isOpen, onClose, onAssign }) => {
         const stationsData = response?.data || response || [];
         setStations(Array.isArray(stationsData) ? stationsData : []);
       } catch (error) {
-        console.error('Error fetching stations:', error);
-        alert('Không thể tải danh sách trạm');
+        console.error("Error fetching stations:", error);
+        alert("Không thể tải danh sách trạm");
       }
     };
 
     if (isOpen) {
       fetchStations();
       // Reset selectedStation when modal opens
-      setSelectedStation(staff?.assignedStation?._id || '');
+      setSelectedStation(staff?.assignedStation?._id || "");
     }
   }, [isOpen, staff]);
 
@@ -35,7 +40,8 @@ const AssignStationModal = ({ staff, isOpen, onClose, onAssign }) => {
       await adminService.assignStaffToStation(staff._id, selectedStation);
       onAssign?.();
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Không thể phân công trạm';
+      const errorMsg =
+        error.response?.data?.message || "Không thể phân công trạm";
       alert(errorMsg);
     } finally {
       setLoading(false);
@@ -50,7 +56,7 @@ const AssignStationModal = ({ staff, isOpen, onClose, onAssign }) => {
       <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <h3 className="text-xl font-semibold mb-4">Phân công trạm</h3>
         <p className="text-gray-600 mb-4">
-          Phân công trạm cho nhân viên: {staff?.fullName || 'Không xác định'}
+          Phân công trạm cho nhân viên: {staff?.fullName || "Không xác định"}
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -67,7 +73,8 @@ const AssignStationModal = ({ staff, isOpen, onClose, onAssign }) => {
               <option value="">-- Chọn trạm --</option>
               {stations.map((station) => (
                 <option key={station._id} value={station._id}>
-                  {station.name} - {station.address?.district || 'Không có địa chỉ'}
+                  {station.name} -{" "}
+                  {station.address?.district || "Không có địa chỉ"}
                 </option>
               ))}
             </select>
@@ -79,7 +86,7 @@ const AssignStationModal = ({ staff, isOpen, onClose, onAssign }) => {
               disabled={loading || !selectedStation}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              {loading ? 'Đang xử lý...' : 'Phân công'}
+              {loading ? "Đang xử lý..." : "Phân công"}
             </button>
             <button
               type="button"
@@ -102,17 +109,12 @@ AssignStationModal.propTypes = {
     fullName: PropTypes.string,
     assignedStation: PropTypes.shape({
       _id: PropTypes.string,
-      name: PropTypes.string
-    })
+      name: PropTypes.string,
+    }),
   }),
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
-  onAssign: PropTypes.func
-};
-
-AssignStationModal.defaultProps = {
-  staff: null,
-  onAssign: () => {}
+  onAssign: PropTypes.func,
 };
 
 export default AssignStationModal;

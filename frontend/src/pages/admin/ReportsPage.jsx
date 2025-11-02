@@ -18,9 +18,12 @@ const ReportsPage = () => {
       .split("T")[0],
     end: new Date().toISOString().split("T")[0],
   });
+  // Temporary state for date inputs before applying filter
+  const [tempDateRange, setTempDateRange] = useState(dateRange);
   const [revenueByStation, setRevenueByStation] = useState([]);
   const [bookingsTrend, setBookingsTrend] = useState([]);
   const [vehicleDistribution, setVehicleDistribution] = useState(null);
+  const [vehicleUsageByHour, setVehicleUsageByHour] = useState([]);
   const [overviewStats, setOverviewStats] = useState(null);
 
   useEffect(() => {
@@ -31,17 +34,21 @@ const ReportsPage = () => {
   const fetchReportData = async () => {
     try {
       setLoading(true);
-      const [revenue, bookings, distribution, overview] = await Promise.all([
-        adminService.getRevenueByStation(dateRange.start, dateRange.end),
-        adminService.getBookingsTrend(dateRange.start, dateRange.end),
-        adminService.getVehicleDistribution(),
-        adminService.getOverviewStats(),
-      ]);
+      const [revenue, bookings, distribution, usage, overview] =
+        await Promise.all([
+          adminService.getRevenueByStation(dateRange.start, dateRange.end),
+          adminService.getBookingsTrend(dateRange.start, dateRange.end),
+          adminService.getVehicleDistribution(),
+          adminService.getVehicleUsageByHour(dateRange.start, dateRange.end),
+          adminService.getOverviewStats(),
+        ]);
 
-      setRevenueByStation(revenue);
-      setBookingsTrend(bookings);
-      setVehicleDistribution(distribution);
-      setOverviewStats(overview);
+      // Unwrap responses
+      setRevenueByStation(revenue?.data || revenue || []);
+      setBookingsTrend(bookings?.data || bookings || []);
+      setVehicleDistribution(distribution?.data || distribution || []);
+      setVehicleUsageByHour(usage?.data || usage || []);
+      setOverviewStats(overview?.data || overview || null);
     } catch (error) {
       console.error("Error fetching report data:", error);
     } finally {
@@ -49,11 +56,18 @@ const ReportsPage = () => {
     }
   };
 
+  // Handle Apply button - update actual dateRange to trigger fetch
+  const handleApplyFilter = () => {
+    setDateRange(tempDateRange);
+  };
+
   const handleExportCSV = () => {
     // Create CSV content
     const csvRows = [
       ["Station", "Revenue", "Bookings"].join(","),
-      ...revenueByStation.map((s) => [s.name, s.revenue, s.bookings].join(",")),
+      ...revenueByStation.map((s) =>
+        [s.station || "N/A", s.revenue || 0, s.bookings || 0].join(",")
+      ),
     ];
 
     const csvContent = csvRows.join("\n");
@@ -106,9 +120,9 @@ const ReportsPage = () => {
             </label>
             <input
               type="date"
-              value={dateRange.start}
+              value={tempDateRange.start}
               onChange={(e) =>
-                setDateRange({ ...dateRange, start: e.target.value })
+                setTempDateRange({ ...tempDateRange, start: e.target.value })
               }
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
@@ -120,18 +134,18 @@ const ReportsPage = () => {
             </label>
             <input
               type="date"
-              value={dateRange.end}
+              value={tempDateRange.end}
               onChange={(e) =>
-                setDateRange({ ...dateRange, end: e.target.value })
+                setTempDateRange({ ...tempDateRange, end: e.target.value })
               }
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <button
-            onClick={fetchReportData}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            onClick={handleApplyFilter}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition"
           >
-            Apply
+            Apply Filter
           </button>
         </div>
       </div>
@@ -356,22 +370,29 @@ const ReportsPage = () => {
           Vehicle Distribution
         </h2>
 
-        {vehicleDistribution ? (
+        {vehicleDistribution &&
+        Array.isArray(vehicleDistribution) &&
+        vehicleDistribution.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(vehicleDistribution).map(([status, count]) => (
-              <div key={status} className="bg-gray-50 rounded-lg p-4">
+            {vehicleDistribution.map((item) => (
+              <div key={item.status} className="bg-gray-50 rounded-lg p-4">
                 <div
                   className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${getStatusColorClass(
-                    status
+                    item.status
                   )}`}
                 >
                   <Car className="w-6 h-6" />
                 </div>
-                <p className="text-sm text-gray-600 capitalize">{status}</p>
-                <p className="text-2xl font-bold text-gray-900">{count}</p>
+                <p className="text-sm text-gray-600 capitalize">
+                  {item.status}
+                </p>
+                <p className="text-2xl font-bold text-gray-900">{item.count}</p>
                 <p className="text-xs text-gray-500">
                   {overviewStats?.totalVehicles > 0
-                    ? ((count / overviewStats.totalVehicles) * 100).toFixed(1)
+                    ? (
+                        (item.count / overviewStats.totalVehicles) *
+                        100
+                      ).toFixed(1)
                     : "0.0"}
                   % of fleet
                 </p>
@@ -385,7 +406,159 @@ const ReportsPage = () => {
         )}
       </div>
 
-      {/* AI Insights Section (Placeholder) */}
+      {/* Vehicle Usage by Hour */}
+      <div className="bg-white rounded-lg shadow-md p-6 mt-8">
+        <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2 mb-6">
+          <TrendingUp className="w-6 h-6 text-orange-600" />
+          Giờ cao điểm (Peak Hours Usage)
+        </h2>
+
+        {vehicleUsageByHour && vehicleUsageByHour.length > 0 ? (
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Chart visualization */}
+              <div className="space-y-2">
+                {vehicleUsageByHour.map((item) => {
+                  const maxBookings = Math.max(
+                    ...vehicleUsageByHour.map((h) => h.bookings)
+                  );
+                  const width =
+                    maxBookings > 0 ? (item.bookings / maxBookings) * 100 : 0;
+                  return (
+                    <div key={item.hour} className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-600 w-12">
+                        {String(item.hour).padStart(2, "0")}:00
+                      </span>
+                      <div className="flex-1 bg-gray-100 h-8 rounded-lg overflow-hidden flex items-center">
+                        <div
+                          className="bg-gradient-to-r from-orange-400 to-orange-600 h-full flex items-center justify-end pr-2"
+                          style={{ width: `${width}%` }}
+                        >
+                          {width > 15 && (
+                            <span className="text-xs font-bold text-white">
+                              {item.bookings}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-sm text-gray-500 w-12">
+                        {item.bookings} bookings
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Statistics Summary */}
+              <div className="space-y-4">
+                {vehicleUsageByHour.length > 0 &&
+                  (() => {
+                    const peakHour = vehicleUsageByHour.reduce((max, item) =>
+                      item.bookings > max.bookings ? item : max
+                    );
+                    const totalBookings = vehicleUsageByHour.reduce(
+                      (sum, item) => sum + item.bookings,
+                      0
+                    );
+                    const avgBookings = (
+                      totalBookings / vehicleUsageByHour.length
+                    ).toFixed(1);
+                    const uniqueVehicles = vehicleUsageByHour.reduce(
+                      (sum, item) => sum + item.uniqueVehicles,
+                      0
+                    );
+
+                    return (
+                      <>
+                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4">
+                          <p className="text-sm text-gray-600 mb-1">
+                            Peak Hour
+                          </p>
+                          <p className="text-2xl font-bold text-orange-600">
+                            {String(peakHour.hour).padStart(2, "0")}:00
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {peakHour.bookings} bookings
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-blue-50 rounded-lg p-3">
+                            <p className="text-xs text-gray-600">
+                              Total Bookings
+                            </p>
+                            <p className="text-xl font-bold text-blue-600">
+                              {totalBookings}
+                            </p>
+                          </div>
+                          <div className="bg-green-50 rounded-lg p-3">
+                            <p className="text-xs text-gray-600">
+                              Avg per Hour
+                            </p>
+                            <p className="text-xl font-bold text-green-600">
+                              {avgBookings}
+                            </p>
+                          </div>
+                          <div className="bg-purple-50 rounded-lg p-3">
+                            <p className="text-xs text-gray-600">
+                              Unique Vehicles
+                            </p>
+                            <p className="text-xl font-bold text-purple-600">
+                              {uniqueVehicles}
+                            </p>
+                          </div>
+                          <div className="bg-pink-50 rounded-lg p-3">
+                            <p className="text-xs text-gray-600">Hours (24h)</p>
+                            <p className="text-xl font-bold text-pink-600">
+                              24
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+              </div>
+            </div>
+
+            {/* Recommendations */}
+            <div className="mt-6 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg p-4 border-l-4 border-orange-500">
+              <p className="text-sm font-medium text-gray-900 mb-2">
+                💡 Peak Hour Insights:
+              </p>
+              <p className="text-sm text-gray-700">
+                {vehicleUsageByHour.length > 0 &&
+                  (() => {
+                    const peakHour = vehicleUsageByHour.reduce((max, item) =>
+                      item.bookings > max.bookings ? item : max
+                    );
+                    const avgBookings = (
+                      vehicleUsageByHour.reduce(
+                        (sum, item) => sum + item.bookings,
+                        0
+                      ) / vehicleUsageByHour.length
+                    ).toFixed(1);
+                    const increase = (
+                      ((peakHour.bookings - avgBookings) / avgBookings) *
+                      100
+                    ).toFixed(0);
+
+                    return `Peak booking time is ${String(
+                      peakHour.hour
+                    ).padStart(2, "0")}:00 with ${
+                      peakHour.bookings
+                    } bookings (+${increase}% above average). Consider increased staff availability and vehicle availability during this period.`;
+                  })()}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-gray-500 text-center py-8">
+            No hourly usage data available for selected period
+          </p>
+        )}
+      </div>
+
+      {/* AI Insights Section */}
       <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg shadow-md p-6 mt-8">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
           📊 AI-Powered Insights
@@ -396,8 +569,18 @@ const ReportsPage = () => {
               Peak Booking Prediction
             </p>
             <p className="text-sm text-gray-600">
-              Based on historical data, expect 25% increase in bookings during
-              weekends.
+              {vehicleUsageByHour.length > 0
+                ? (() => {
+                    const peakHour = vehicleUsageByHour.reduce((max, item) =>
+                      item.bookings > max.bookings ? item : max
+                    );
+                    return `Booking peak occurs at ${String(
+                      peakHour.hour
+                    ).padStart(2, "0")}:00 with ${
+                      peakHour.bookings
+                    } bookings. Plan staffing and vehicle allocation accordingly.`;
+                  })()
+                : "Based on historical data, expect higher booking volume during business hours."}
             </p>
           </div>
           <div className="bg-white rounded-lg p-4">
@@ -406,7 +589,9 @@ const ReportsPage = () => {
             </p>
             <p className="text-sm text-gray-600">
               Projected revenue for next month: $
-              {(overviewStats?.totalRevenue * 1.15)?.toFixed(2) || "0.00"}
+              {(overviewStats?.revenue?.monthly * 1.15)?.toFixed(2) ||
+                (overviewStats?.totalRevenue * 1.15)?.toFixed(2) ||
+                "0.00"}
             </p>
           </div>
           <div className="bg-white rounded-lg p-4">
@@ -415,7 +600,7 @@ const ReportsPage = () => {
             </p>
             <p className="text-sm text-gray-600">
               Consider transferring 3 vehicles to high-demand stations for
-              better utilization.
+              better utilization during peak hours.
             </p>
           </div>
         </div>

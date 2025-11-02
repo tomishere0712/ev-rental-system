@@ -1,6 +1,16 @@
 import { useState, useEffect } from "react";
 import { adminService } from "../../services";
-import { Car, Plus, Edit, Trash2, Search, Battery, MapPin } from "lucide-react";
+import {
+  Car,
+  Plus,
+  Edit,
+  Trash2,
+  Search,
+  Battery,
+  MapPin,
+  Truck,
+} from "lucide-react";
+import toast from "react-hot-toast";
 
 const ManageVehiclesPage = () => {
   const [vehicles, setVehicles] = useState([]);
@@ -9,17 +19,25 @@ const ManageVehiclesPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [showModal, setShowModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferVehicle, setTransferVehicle] = useState(null);
+  const [transferStationId, setTransferStationId] = useState("");
   const [editingVehicle, setEditingVehicle] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
   const [formData, setFormData] = useState({
+    name: "",
     brand: "",
     model: "",
     year: new Date().getFullYear(),
     licensePlate: "",
-    color: "",
+    type: "scooter",
     batteryCapacity: "",
     range: "",
+    pricePerHour: "",
     pricePerDay: "",
-    station: "",
+    deposit: "",
+    currentStation: "",
     status: "available",
   });
 
@@ -34,8 +52,16 @@ const ManageVehiclesPage = () => {
         adminService.getAllVehicles(),
         adminService.getAllStations(),
       ]);
-      setVehicles(vehiclesData);
-      setStations(stationsData);
+      // Unwrap vehicles response - backend returns { success, data: { vehicles: [...] } }
+      const vehiclesArray = vehiclesData?.data?.vehicles || [];
+      // Unwrap stations response
+      const stationsArray =
+        stationsData?.data ||
+        stationsData?.stations ||
+        (Array.isArray(stationsData) ? stationsData : []);
+
+      setVehicles(Array.isArray(vehiclesArray) ? vehiclesArray : []);
+      setStations(Array.isArray(stationsArray) ? stationsArray : []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -49,31 +75,34 @@ const ManageVehiclesPage = () => {
     try {
       if (editingVehicle) {
         await adminService.updateVehicle(editingVehicle._id, formData);
-        alert("Vehicle updated successfully!");
+        toast.success("Vehicle updated successfully!");
       } else {
         await adminService.createVehicle(formData);
-        alert("Vehicle created successfully!");
+        toast.success("Vehicle created successfully!");
       }
 
       fetchData();
       closeModal();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to save vehicle");
+      toast.error(error.response?.data?.message || "Failed to save vehicle");
     }
   };
 
   const handleEdit = (vehicle) => {
     setEditingVehicle(vehicle);
     setFormData({
+      name: vehicle.name,
       brand: vehicle.brand,
       model: vehicle.model,
       year: vehicle.year,
       licensePlate: vehicle.licensePlate,
-      color: vehicle.color,
+      type: vehicle.type,
       batteryCapacity: vehicle.batteryCapacity,
       range: vehicle.range,
+      pricePerHour: vehicle.pricePerHour,
       pricePerDay: vehicle.pricePerDay,
-      station: vehicle.station?._id || "",
+      deposit: vehicle.deposit,
+      currentStation: vehicle.currentStation?._id || "",
       status: vehicle.status,
     });
     setShowModal(true);
@@ -84,10 +113,10 @@ const ManageVehiclesPage = () => {
 
     try {
       await adminService.deleteVehicle(vehicleId);
-      alert("Vehicle deleted successfully!");
+      toast.success("Vehicle deleted successfully!");
       fetchData();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to delete vehicle");
+      toast.error(error.response?.data?.message || "Failed to delete vehicle");
     }
   };
 
@@ -95,15 +124,18 @@ const ManageVehiclesPage = () => {
     setShowModal(false);
     setEditingVehicle(null);
     setFormData({
+      name: "",
       brand: "",
       model: "",
       year: new Date().getFullYear(),
       licensePlate: "",
-      color: "",
+      type: "scooter",
       batteryCapacity: "",
       range: "",
+      pricePerHour: "",
       pricePerDay: "",
-      station: "",
+      deposit: "",
+      currentStation: "",
       status: "available",
     });
   };
@@ -117,6 +149,49 @@ const ManageVehiclesPage = () => {
       filterStatus === "all" || vehicle.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredVehicles.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedVehicles = filteredVehicles.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search/filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterStatus]);
+
+  const handleTransferClick = (vehicle) => {
+    setTransferVehicle(vehicle);
+    setTransferStationId(vehicle.currentStation?._id || "");
+    setShowTransferModal(true);
+  };
+
+  const handleTransfer = async (e) => {
+    e.preventDefault();
+    if (!transferStationId) {
+      alert("Vui lòng chọn trạm");
+      return;
+    }
+
+    try {
+      await adminService.transferVehicle(
+        transferVehicle._id,
+        transferStationId
+      );
+      toast.success("Đã chuyển xe thành công!");
+      setShowTransferModal(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Lỗi khi chuyển xe");
+    }
+  };
+
+  const closeTransferModal = () => {
+    setShowTransferModal(false);
+    setTransferVehicle(null);
+    setTransferStationId("");
+  };
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -195,6 +270,9 @@ const ManageVehiclesPage = () => {
                   Vehicle
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Type
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   License Plate
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -207,7 +285,13 @@ const ManageVehiclesPage = () => {
                   Range
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Price/Hour
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Price/Day
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Deposit
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Status
@@ -218,7 +302,7 @@ const ManageVehiclesPage = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredVehicles.map((vehicle) => (
+              {paginatedVehicles.map((vehicle) => (
                 <tr key={vehicle._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -227,13 +311,18 @@ const ManageVehiclesPage = () => {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          {vehicle.brand}
+                          {vehicle.name}
                         </p>
                         <p className="text-sm text-gray-500">
-                          {vehicle.model} ({vehicle.year})
+                          {vehicle.brand} {vehicle.model} ({vehicle.year})
                         </p>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium capitalize">
+                      {vehicle.type}
+                    </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900 font-medium">
                     {vehicle.licensePlate}
@@ -241,20 +330,26 @@ const ManageVehiclesPage = () => {
                   <td className="px-6 py-4 text-sm text-gray-900">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-4 h-4 text-gray-400" />
-                      {vehicle.station?.name || "N/A"}
+                      {vehicle.currentStation?.name || "N/A"}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
                     <div className="flex items-center gap-1">
                       <Battery className="w-4 h-4 text-gray-400" />
-                      {vehicle.batteryLevel}%
+                      {vehicle.currentBatteryLevel}%
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
                     {vehicle.range} km
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-green-600">
+                    ${vehicle.pricePerHour}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-semibold text-green-600">
                     ${vehicle.pricePerDay}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-semibold text-orange-600">
+                    ${vehicle.deposit}
                   </td>
                   <td className="px-6 py-4">
                     <span
@@ -270,12 +365,21 @@ const ManageVehiclesPage = () => {
                       <button
                         onClick={() => handleEdit(vehicle)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                        title="Edit"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
+                        onClick={() => handleTransferClick(vehicle)}
+                        className="p-2 text-purple-600 hover:bg-purple-50 rounded"
+                        title="Transfer to Station"
+                      >
+                        <Truck className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => handleDelete(vehicle._id)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded"
+                        title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -286,6 +390,47 @@ const ManageVehiclesPage = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {filteredVehicles.length > 0 && (
+          <div className="flex items-center justify-center mt-6 p-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-2">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-2 rounded-lg ${
+                        page === currentPage
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
+              </div>
+              <button
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                }
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
 
         {filteredVehicles.length === 0 && (
           <div className="text-center py-12">
@@ -313,6 +458,38 @@ const ManageVehiclesPage = () => {
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Tesla Model 3"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type *
+                  </label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) =>
+                      setFormData({ ...formData, type: e.target.value })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="scooter">Scooter</option>
+                    <option value="motorcycle">Motorcycle</option>
+                    <option value="car">Car</option>
+                  </select>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Brand *
@@ -374,29 +551,16 @@ const ManageVehiclesPage = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Color *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, color: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Battery Capacity (kWh) *
                   </label>
                   <input
                     type="number"
+                    step="0.1"
                     value={formData.batteryCapacity}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        batteryCapacity: e.target.value,
+                        batteryCapacity: parseFloat(e.target.value),
                       })
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -409,9 +573,31 @@ const ManageVehiclesPage = () => {
                   </label>
                   <input
                     type="number"
+                    step="1"
                     value={formData.range}
                     onChange={(e) =>
-                      setFormData({ ...formData, range: e.target.value })
+                      setFormData({
+                        ...formData,
+                        range: parseInt(e.target.value),
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Price per Hour ($) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.pricePerHour}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        pricePerHour: parseFloat(e.target.value),
+                      })
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
@@ -426,7 +612,10 @@ const ManageVehiclesPage = () => {
                     step="0.01"
                     value={formData.pricePerDay}
                     onChange={(e) =>
-                      setFormData({ ...formData, pricePerDay: e.target.value })
+                      setFormData({
+                        ...formData,
+                        pricePerDay: parseFloat(e.target.value),
+                      })
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
@@ -434,12 +623,33 @@ const ManageVehiclesPage = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Station *
+                    Deposit ($) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.deposit}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        deposit: parseFloat(e.target.value),
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Current Station *
                   </label>
                   <select
-                    value={formData.station}
+                    value={formData.currentStation}
                     onChange={(e) =>
-                      setFormData({ ...formData, station: e.target.value })
+                      setFormData({
+                        ...formData,
+                        currentStation: e.target.value,
+                      })
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
@@ -467,6 +677,7 @@ const ManageVehiclesPage = () => {
                     <option value="available">Available</option>
                     <option value="rented">Rented</option>
                     <option value="maintenance">Maintenance</option>
+                    <option value="charging">Charging</option>
                     <option value="unavailable">Unavailable</option>
                   </select>
                 </div>
@@ -485,6 +696,73 @@ const ManageVehiclesPage = () => {
                   className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
                 >
                   Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Vehicle Modal */}
+      {showTransferModal && transferVehicle && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4 flex justify-between items-center rounded-t-lg">
+              <h3 className="text-xl font-semibold text-white">
+                Chuyển Xe Sang Trạm Khác
+              </h3>
+              <button
+                onClick={closeTransferModal}
+                className="text-white hover:bg-purple-800 rounded-full p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleTransfer} className="p-6 space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                <p className="text-sm text-gray-600 mb-1">Xe hiện tại:</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {transferVehicle.brand} {transferVehicle.model} (
+                  {transferVehicle.licensePlate})
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  Trạm hiện tại: {transferVehicle.currentStation?.name || "N/A"}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chọn Trạm Đích *
+                </label>
+                <select
+                  value={transferStationId}
+                  onChange={(e) => setTransferStationId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">-- Chọn trạm --</option>
+                  {stations.map((station) => (
+                    <option key={station._id} value={station._id}>
+                      {station.name} ({station.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+                >
+                  Chuyển Xe
+                </button>
+                <button
+                  type="button"
+                  onClick={closeTransferModal}
+                  className="flex-1 px-4 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
+                >
+                  Hủy
                 </button>
               </div>
             </form>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { adminService } from "../../services";
 import { MapPin, Plus, Edit, Trash2, Search, Car } from "lucide-react";
+import toast from "react-hot-toast";
 
 const ManageStationsPage = () => {
   const [stations, setStations] = useState([]);
@@ -80,6 +81,38 @@ const ManageStationsPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Convert operatingHours from { open, close } to per-day format
+    const operatingHoursPerDay = {
+      monday: {
+        open: formData.operatingHours.open,
+        close: formData.operatingHours.close,
+      },
+      tuesday: {
+        open: formData.operatingHours.open,
+        close: formData.operatingHours.close,
+      },
+      wednesday: {
+        open: formData.operatingHours.open,
+        close: formData.operatingHours.close,
+      },
+      thursday: {
+        open: formData.operatingHours.open,
+        close: formData.operatingHours.close,
+      },
+      friday: {
+        open: formData.operatingHours.open,
+        close: formData.operatingHours.close,
+      },
+      saturday: {
+        open: formData.operatingHours.open,
+        close: formData.operatingHours.close,
+      },
+      sunday: {
+        open: formData.operatingHours.open,
+        close: formData.operatingHours.close,
+      },
+    };
+
     const payload = {
       name: formData.name,
       code: formData.code,
@@ -92,7 +125,7 @@ const ManageStationsPage = () => {
         lat: parseFloat(formData.coordinates.lat),
         lng: parseFloat(formData.coordinates.lng),
       },
-      operatingHours: formData.operatingHours,
+      operatingHours: operatingHoursPerDay,
       totalParkingSpots: parseInt(formData.totalParkingSpots),
       chargingStations: parseInt(formData.chargingStations),
     };
@@ -100,16 +133,16 @@ const ManageStationsPage = () => {
     try {
       if (editingStation) {
         await adminService.updateStation(editingStation._id, payload);
-        alert("Station updated successfully!");
+        toast.success("Station updated successfully!");
       } else {
         await adminService.createStation(payload);
-        alert("Station created successfully!");
+        toast.success("Station created successfully!");
       }
 
       fetchStations();
       closeModal();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to save station");
+      toast.error(error.response?.data?.message || "Failed to save station");
     }
   };
 
@@ -126,7 +159,10 @@ const ManageStationsPage = () => {
         lat: station.coordinates?.lat?.toString() || "",
         lng: station.coordinates?.lng?.toString() || "",
       },
-      operatingHours: station.operatingHours,
+      operatingHours: station.operatingHours || {
+        open: "08:00",
+        close: "20:00",
+      },
       totalParkingSpots: (
         station.totalParkingSpots ||
         station.capacity ||
@@ -142,10 +178,10 @@ const ManageStationsPage = () => {
 
     try {
       await adminService.deleteStation(stationId);
-      alert("Station deleted successfully!");
+      toast.success("Station deleted successfully!");
       fetchStations();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to delete station");
+      toast.error(error.response?.data?.message || "Failed to delete station");
     }
   };
 
