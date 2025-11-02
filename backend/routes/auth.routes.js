@@ -34,8 +34,10 @@ router.post(
   protect,
   authorize("renter"),
   upload.fields([
-    { name: "driverLicense", maxCount: 2 },
-    { name: "nationalId", maxCount: 2 },
+    { name: "driverLicenseFront", maxCount: 1 },
+    { name: "driverLicenseBack", maxCount: 1 },
+    { name: "nationalIdFront", maxCount: 1 },
+    { name: "nationalIdBack", maxCount: 1 },
   ]),
   uploadDocuments
 );
