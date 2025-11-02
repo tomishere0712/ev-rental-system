@@ -8,6 +8,7 @@ const {
   cancelBooking,
   signContract,
   getRentalHistory,
+  confirmRefundReceived,
 } = require("../controllers/booking.controller");
 
 // @route   POST /api/bookings
@@ -44,6 +45,16 @@ router.put("/:id/cancel", protect, cancelBooking);
 // @desc    Sign digital contract
 // @access  Private/Renter
 router.post("/:id/sign-contract", protect, authorize("renter"), signContract);
+
+// @route   POST /api/bookings/:id/confirm-refund-received
+// @desc    User confirms they received the manual refund
+// @access  Private/Renter
+router.post(
+  "/:id/confirm-refund-received",
+  protect,
+  authorize("renter"),
+  confirmRefundReceived
+);
 
 // @route   PUT /api/bookings/:id/pickup
 // @desc    Process vehicle pickup (Staff)

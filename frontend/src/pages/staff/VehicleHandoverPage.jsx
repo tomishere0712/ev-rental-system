@@ -40,14 +40,25 @@ const VehicleHandoverPage = () => {
 
     try {
       const bookings = await staffService.getBookings({ search: searchQuery });
-      const foundBooking = bookings.find(
-        (b) => b.bookingNumber === searchQuery || b.user?.email === searchQuery
+      console.log("Search results:", bookings);
+
+      // Filter bookings that can be processed (pending/approved for pickup, active for return)
+      const processableBookings = bookings.filter(
+        (b) =>
+          b.status === "pending" ||
+          b.status === "approved" ||
+          b.status === "active"
       );
 
-      if (foundBooking) {
+      if (processableBookings.length > 0) {
+        const foundBooking = processableBookings[0]; // Take first processable booking
         setBooking(foundBooking);
+
         // Determine handover type based on booking status
-        if (foundBooking.status === "approved") {
+        if (
+          foundBooking.status === "pending" ||
+          foundBooking.status === "approved"
+        ) {
           setHandoverType("pickup");
         } else if (foundBooking.status === "active") {
           setHandoverType("return");
@@ -63,7 +74,11 @@ const VehicleHandoverPage = () => {
           }
         }
       } else {
-        setError("No booking found with this booking number or email");
+        setError(
+          "No pending/approved/active booking found with this search. Found " +
+            bookings.length +
+            " booking(s) but status is not processable."
+        );
       }
     } catch (err) {
       setError(err.response?.data?.message || "Failed to search booking");

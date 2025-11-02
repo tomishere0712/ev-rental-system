@@ -116,10 +116,47 @@ const bookingSchema = new mongoose.Schema(
       terms: String,
     },
 
+    // Return Request (Optional - User initiated)
+    returnRequest: {
+      requested: { type: Boolean, default: false },
+      requestedAt: Date,
+      expectedReturnTime: Date,
+      notes: String,
+    },
+
+    // Deposit Refund (Manual Bank Transfer)
+    depositRefund: {
+      amount: Number,
+      method: { type: String, default: "manual" }, // manual bank transfer
+      status: {
+        type: String,
+        enum: ["pending", "refunded", "confirmed"],
+        default: "pending",
+      },
+      // Staff marks as refunded after bank transfer
+      refundedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      refundedAt: Date,
+      transferReference: String, // Bank transfer reference
+      transferNotes: String,
+      // User confirms receipt
+      confirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      confirmedAt: Date,
+    },
+
     // Status
     status: {
       type: String,
-      enum: ["reserved", "pending", "confirmed", "in-progress", "completed", "cancelled"],
+      enum: [
+        "reserved",
+        "pending",
+        "confirmed",
+        "in-progress",
+        "pending_return", // User requested return
+        "returning", // Staff inspecting
+        "refund_pending", // Waiting for user to confirm refund received
+        "completed",
+        "cancelled",
+      ],
       default: "reserved",
     },
 

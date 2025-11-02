@@ -25,7 +25,7 @@ exports.createBooking = async (req, res) => {
     // Check for overlapping bookings (reserved, pending, confirmed, or in-progress)
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     const overlappingBooking = await Booking.findOne({
       vehicle,
       status: { $in: ["reserved", "pending", "confirmed", "in-progress"] },
@@ -40,9 +40,9 @@ exports.createBooking = async (req, res) => {
     });
 
     if (overlappingBooking) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: "Xe đã có người đặt trong khoảng thời gian này",
-        conflictBooking: overlappingBooking.bookingNumber 
+        conflictBooking: overlappingBooking.bookingNumber,
       });
     }
 
@@ -59,7 +59,10 @@ exports.createBooking = async (req, res) => {
 
     // Generate booking number manually (validation runs before pre-save hooks)
     const count = await Booking.countDocuments();
-    const bookingNumber = `BK${Date.now()}${String(count + 1).padStart(4, "0")}`;
+    const bookingNumber = `BK${Date.now()}${String(count + 1).padStart(
+      4,
+      "0"
+    )}`;
     console.log("Generated bookingNumber:", bookingNumber);
 
     // Calculate reservation timeout (5 minutes from now)
@@ -84,12 +87,19 @@ exports.createBooking = async (req, res) => {
       reservedUntil,
     });
     await booking.save();
-    console.log("✅ Booking saved successfully:", bookingNumber, "- Reserved until:", reservedUntil);
+    console.log(
+      "✅ Booking saved successfully:",
+      bookingNumber,
+      "- Reserved until:",
+      reservedUntil
+    );
 
     // Update vehicle status to "reserved" ngay khi giữ chỗ
     // Nếu hết 5 phút không thanh toán, scheduler sẽ hủy booking và cần trả xe về "available"
     await Vehicle.findByIdAndUpdate(vehicle, { status: "reserved" });
-    console.log("✅ Vehicle status updated to: reserved (holding for 5 minutes)");
+    console.log(
+      "✅ Vehicle status updated to: reserved (holding for 5 minutes)"
+    );
 
     // Populate booking details
     const populatedBooking = await Booking.findById(booking._id)
@@ -119,11 +129,11 @@ exports.getMyBookings = async (req, res) => {
   try {
     const { status, page = 1, limit = 10 } = req.query;
 
-    const filter = { 
+    const filter = {
       renter: req.user.id,
       // Hiện tất cả trạng thái - không filter cancelled nữa
     };
-    
+
     if (status) filter.status = status;
 
     const skip = (page - 1) * limit;
@@ -334,6 +344,60 @@ exports.getRentalHistory = async (req, res) => {
           vehicleTypePreference: vehicleTypes,
         },
       },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    User confirms they received the manual refund
+// @route   POST /api/bookings/:id/confirm-refund-received
+// @access  Private/Renter
+exports.confirmRefundReceived = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({ message: "Không tìm thấy booking" });
+    }
+
+    // Verify user is the renter
+    if (booking.renter.toString() !== req.user._id.toString()) {
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền xác nhận booking này" });
+    }
+
+    // Only allow confirmation if status is refund_pending
+    if (booking.status !== "refund_pending") {
+      return res.status(400).json({
+        message:
+          "Booking chưa sẵn sàng xác nhận hoàn tiền. Trạng thái hiện tại: " +
+          booking.status,
+      });
+    }
+
+    // Check if staff has actually marked it as refunded
+    if (!booking.depositRefund || booking.depositRefund.status !== "refunded") {
+      return res.status(400).json({
+        message: "Staff chưa xác nhận chuyển khoản. Vui lòng đợi staff xử lý",
+      });
+    }
+
+    // Update deposit refund confirmation
+    booking.depositRefund.status = "confirmed";
+    booking.depositRefund.confirmedBy = req.user._id;
+    booking.depositRefund.confirmedAt = new Date();
+
+    // Mark booking as completed
+    booking.status = "completed";
+
+    await booking.save();
+
+    res.json({
+      success: true,
+      data: booking,
+      message: `Đã xác nhận nhận tiền hoàn cọc ${booking.depositRefund.amount.toLocaleString()}đ. Cảm ơn bạn đã sử dụng dịch vụ!`,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

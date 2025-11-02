@@ -21,6 +21,7 @@ import BookVehiclePage from "../pages/renter/BookVehiclePage";
 import MyBookingsPage from "../pages/renter/MyBookingsPage";
 import BookingDetailPage from "../pages/renter/BookingDetailPage";
 import RentalHistoryPage from "../pages/renter/RentalHistoryPage";
+import ContractSigningPage from "../pages/renter/ContractSigningPage";
 
 // Staff Pages
 import StaffDashboard from "../pages/staff/StaffDashboard";
@@ -28,6 +29,9 @@ import CustomerVerificationPage from "../pages/staff/CustomerVerificationPage";
 import ProcessPaymentPage from "../pages/staff/ProcessPaymentPage";
 import StationVehiclesPage from "../pages/staff/StationVehiclesPage";
 import VehicleHandoverPage from "../pages/staff/VehicleHandoverPage";
+import VehiclePickupPage from "../pages/staff/VehiclePickupPage";
+import VehicleReturnPage from "../pages/staff/VehicleReturnPage";
+import StaffProfilePage from "../pages/staff/StaffProfilePage";
 
 // Admin Pages
 import AdminDashboard from "../pages/admin/AdminDashboard";
@@ -124,6 +128,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "renter/bookings/:id/contract",
+        element: (
+          <RenterRoute>
+            <ContractSigningPage />
+          </RenterRoute>
+        ),
+      },
+      {
         path: "renter/history",
         element: (
           <RenterRoute>
@@ -170,6 +182,30 @@ export const router = createBrowserRouter([
         element: (
           <StaffRoute>
             <VehicleHandoverPage />
+          </StaffRoute>
+        ),
+      },
+      {
+        path: "staff/bookings/:id/pickup",
+        element: (
+          <StaffRoute>
+            <VehiclePickupPage />
+          </StaffRoute>
+        ),
+      },
+      {
+        path: "staff/bookings/:id/return",
+        element: (
+          <StaffRoute>
+            <VehicleReturnPage />
+          </StaffRoute>
+        ),
+      },
+      {
+        path: "staff/profile",
+        element: (
+          <StaffRoute>
+            <StaffProfilePage />
           </StaffRoute>
         ),
       },
