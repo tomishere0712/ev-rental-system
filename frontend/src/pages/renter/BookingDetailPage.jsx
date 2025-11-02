@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { bookingService } from "../../services";
+import { bookingService, paymentService } from "../../services";
 import {
   Calendar,
   Car,
@@ -45,6 +45,11 @@ const BookingDetailPage = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
+      reserved: {
+        color: "bg-orange-100 text-orange-800 border-orange-200",
+        text: "Giữ chỗ",
+        icon: Clock,
+      },
       pending: {
         color: "bg-yellow-100 text-yellow-800 border-yellow-200",
         text: "Chờ xác nhận",
@@ -345,6 +350,47 @@ const BookingDetailPage = () => {
         )}
 
         {/* Actions */}
+        {/* Nút thanh toán cho booking "reserved" */}
+        {booking.status === "reserved" && (
+          <div className="bg-orange-50 rounded-lg shadow-md p-6 border-2 border-orange-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-orange-900 mb-1">
+                  ⏰ Vui lòng thanh toán để xác nhận đơn
+                </h3>
+                <p className="text-sm text-orange-700">
+                  Đơn sẽ tự động hủy sau: {booking.reservedUntil && new Date(booking.reservedUntil).toLocaleString("vi-VN")}
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    toast.loading("Đang tạo link thanh toán...");
+                    
+                    // Tạo payment link
+                    const response = await paymentService.createVNPayUrl(booking._id);
+                    
+                    toast.dismiss();
+                    
+                    if (response.data?.paymentUrl) {
+                      window.location.href = response.data.paymentUrl;
+                    } else {
+                      toast.error("Không nhận được link thanh toán");
+                    }
+                  } catch (error) {
+                    toast.dismiss();
+                    console.error("Payment error:", error);
+                    toast.error(error.response?.data?.message || "Có lỗi xảy ra khi tạo thanh toán");
+                  }
+                }}
+                className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+              >
+                Thanh toán ngay
+              </button>
+            </div>
+          </div>
+        )}
+
         {(booking.status === "pending" || booking.status === "confirmed") && (
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-between">

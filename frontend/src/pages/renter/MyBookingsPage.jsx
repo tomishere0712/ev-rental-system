@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { bookingService } from "../../services";
+import { bookingService, paymentService } from "../../services";
 import VerificationAlert from "../../components/VerificationAlert";
 import {
   Calendar,
@@ -79,7 +79,13 @@ const MyBookingsPage = () => {
       
       // Backend returns: { success, data: [...], pagination: {...} }
       const bookingsData = response.data || [];
-      setBookings(Array.isArray(bookingsData) ? bookingsData : []);
+      
+      // Hiện tất cả trạng thái (bao gồm cả cancelled, reserved)
+      const filteredBookings = Array.isArray(bookingsData) 
+        ? bookingsData
+        : [];
+      
+      setBookings(filteredBookings);
       
       setPagination((prev) => ({
         ...prev,
@@ -115,6 +121,11 @@ const MyBookingsPage = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
+      reserved: {
+        color: "bg-orange-100 text-orange-800 border-orange-200",
+        text: "Giữ chỗ",
+        icon: Clock,
+      },
       pending: {
         color: "bg-yellow-100 text-yellow-800 border-yellow-200",
         text: "Chờ xác nhận",
@@ -311,6 +322,21 @@ const MyBookingsPage = () => {
                         {getStatusBadge(booking.status)}
                       </div>
 
+                      {/* Hiện thời gian còn lại nếu status = "reserved" */}
+                      {booking.status === "reserved" && booking.reservedUntil && (
+                        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                          <div className="flex items-center gap-2 text-orange-800">
+                            <Clock className="w-4 h-4" />
+                            <span className="text-sm font-medium">
+                              Vui lòng thanh toán trước: {new Date(booking.reservedUntil).toLocaleString("vi-VN")}
+                            </span>
+                          </div>
+                          <div className="text-xs text-orange-600 mt-1">
+                            Đơn sẽ tự động hủy nếu không thanh toán trong thời gian trên
+                          </div>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="flex items-start gap-3">
                           <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
@@ -354,6 +380,35 @@ const MyBookingsPage = () => {
                           >
                             Xem chi tiết →
                           </Link>
+
+                          {/* Nút thanh toán cho booking "reserved" */}
+                          {booking.status === "reserved" && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  toast.loading("Đang tạo link thanh toán...");
+                                  
+                                  // Tạo payment link VNPay
+                                  const response = await paymentService.createVNPayUrl(booking._id);
+                                  
+                                  toast.dismiss();
+                                  
+                                  if (response.data?.paymentUrl) {
+                                    window.location.href = response.data.paymentUrl;
+                                  } else {
+                                    toast.error("Không nhận được link thanh toán");
+                                  }
+                                } catch (error) {
+                                  toast.dismiss();
+                                  console.error("Payment error:", error);
+                                  toast.error(error.response?.data?.message || "Không thể tạo thanh toán. Vui lòng thử lại!");
+                                }
+                              }}
+                              className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+                            >
+                              Thanh toán ngay
+                            </button>
+                          )}
 
                           {(booking.status === "pending" || booking.status === "confirmed") && (
                             <button

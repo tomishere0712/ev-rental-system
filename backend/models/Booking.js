@@ -89,6 +89,25 @@ const bookingSchema = new mongoose.Schema(
       totalAmount: Number,
     },
 
+    // Payment
+    payment: {
+      orderCode: String,
+      method: {
+        type: String,
+        enum: ["online", "cash", "bank_transfer"],
+        default: "online",
+      },
+      amount: Number,
+      status: {
+        type: String,
+        enum: ["pending", "completed", "failed", "refunded"],
+        default: "pending",
+      },
+      paidAt: Date,
+      refundedAt: Date,
+      refundAmount: Number,
+    },
+
     // Contract
     contract: {
       signed: { type: Boolean, default: false },
@@ -100,8 +119,13 @@ const bookingSchema = new mongoose.Schema(
     // Status
     status: {
       type: String,
-      enum: ["pending", "confirmed", "in-progress", "completed", "cancelled"],
-      default: "pending",
+      enum: ["reserved", "pending", "confirmed", "in-progress", "completed", "cancelled"],
+      default: "reserved",
+    },
+
+    // Reservation timeout (for auto-cancel after 5 minutes)
+    reservedUntil: {
+      type: Date,
     },
 
     // Cancellation

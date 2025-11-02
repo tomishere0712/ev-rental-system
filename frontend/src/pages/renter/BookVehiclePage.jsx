@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
-import { vehicleService, stationService, bookingService } from "../../services";
+import { vehicleService, stationService, bookingService, paymentService } from "../../services";
 import VerificationAlert from "../../components/VerificationAlert";
 import {
   Car,
@@ -12,6 +12,9 @@ import {
   AlertCircle,
   CheckCircle,
   ArrowRight,
+  Search,
+  Filter,
+  DollarSign,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -30,23 +33,80 @@ const BookVehiclePage = () => {
   const [confirmAction, setConfirmAction] = useState(null); // 'select' or 'back'
   const [tempSelectedVehicle, setTempSelectedVehicle] = useState(null);
 
+  // Filter state for Step 1
+  const [filters, setFilters] = useState({
+    search: "",
+    type: "",
+    minPrice: "",
+    maxPrice: "",
+    minBattery: "",
+    station: "",
+  });
+
+  const vehicleTypes = ["scooter", "motorcycle", "car", "bike"];
+
   const [formData, setFormData] = useState({
     vehicleId: vehicleIdFromUrl || "",
     pickupStationId: "",
-    returnStationId: "",
-    pickupTime: "",
-    expectedReturnTime: "",
+    pickupDate: "", // Ngày lấy xe
+    pickupTime: "", // Giờ lấy xe
     rentalType: "hour", // "hour" or "day"
-    paymentMethod: "cash", // cash or bank_transfer
+    rentalDuration: 1, // Số giờ hoặc số ngày
+    paymentMethod: "online", // online payment only
     documentVerification: "", // at_station or from_profile
     notes: "",
   });
 
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [selectedPickupStation, setSelectedPickupStation] = useState(null);
-  const [selectedReturnStation, setSelectedReturnStation] = useState(null);
   const [estimatedPrice, setEstimatedPrice] = useState(0);
   const [depositAmount, setDepositAmount] = useState(0);
+
+  // Set default pickup date and time to now + 30 minutes
+  useEffect(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 30); // Add 30 minutes
+    
+    // Get local date in YYYY-MM-DD format
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const timeStr = `${hours}:${minutes}`; // HH:mm
+    
+    setFormData((prev) => ({
+      ...prev,
+      pickupDate: dateStr,
+      pickupTime: timeStr,
+    }));
+  }, []);
+
+  // Update pickup time when rental type changes to "hour"
+  useEffect(() => {
+    if (formData.rentalType === 'hour') {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 30); // Add 30 minutes
+      
+      // Get local date in YYYY-MM-DD format
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const timeStr = `${hours}:${minutes}`;
+      
+      setFormData((prev) => ({
+        ...prev,
+        pickupDate: dateStr,
+        pickupTime: timeStr,
+      }));
+    }
+  }, [formData.rentalType]);
 
   useEffect(() => {
     if (vehicleIdFromUrl) {
@@ -59,19 +119,50 @@ const BookVehiclePage = () => {
     fetchStations();
   }, [vehicleIdFromUrl]);
 
+  // Auto-set pickup station when vehicle is selected
+  useEffect(() => {
+    if (selectedVehicle && selectedVehicle.currentStation) {
+      const stationId = typeof selectedVehicle.currentStation === 'object' 
+        ? selectedVehicle.currentStation._id 
+        : selectedVehicle.currentStation;
+      
+      setFormData((prev) => ({ 
+        ...prev, 
+        pickupStationId: stationId 
+      }));
+      
+      // Find and set the station object
+      const station = stations.find((s) => s._id === stationId);
+      if (station) {
+        setSelectedPickupStation(station);
+      }
+    }
+  }, [selectedVehicle, stations]);
+
   useEffect(() => {
     calculateEstimatedPrice();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.pickupTime, formData.expectedReturnTime, selectedVehicle]);
+  }, [formData.rentalDuration, formData.rentalType, selectedVehicle]);
 
   const fetchVehicles = async () => {
     try {
       setLoading(true);
-      console.log("Fetching vehicles...");
-      const response = await vehicleService.getVehicles({
+      console.log("Fetching vehicles with filters:", filters);
+      
+      // Build params with filters
+      const params = {
         status: "available",
         limit: 100,
-      });
+      };
+
+      if (filters.search) params.search = filters.search;
+      if (filters.type) params.type = filters.type;
+      if (filters.minPrice) params.minPrice = filters.minPrice;
+      if (filters.maxPrice) params.maxPrice = filters.maxPrice;
+      if (filters.minBattery) params.minBattery = filters.minBattery;
+      if (filters.station) params.station = filters.station;
+
+      const response = await vehicleService.getVehicles(params);
       console.log("Vehicles response:", response);
       setVehicles(response.data.vehicles);
     } catch (error) {
@@ -115,6 +206,32 @@ const BookVehiclePage = () => {
     }
   };
 
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      search: "",
+      type: "",
+      minPrice: "",
+      maxPrice: "",
+      minBattery: "",
+      station: "",
+    });
+    fetchVehicles();
+  };
+
+  const applyFilters = () => {
+    fetchVehicles();
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter") {
+      fetchVehicles();
+    }
+  };
+
   const handleSelectVehicle = (vehicle) => {
     setTempSelectedVehicle(vehicle);
     setConfirmAction('select');
@@ -149,67 +266,32 @@ const BookVehiclePage = () => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    // Auto-select station objects
+    // Auto-select station object
     if (name === "pickupStationId") {
       const station = stations.find((s) => s._id === value);
       setSelectedPickupStation(station);
     }
-    if (name === "returnStationId") {
-      const station = stations.find((s) => s._id === value);
-      setSelectedReturnStation(station);
-    }
   };
 
   const calculateEstimatedPrice = () => {
-    if (
-      !formData.pickupTime ||
-      !formData.expectedReturnTime ||
-      !selectedVehicle
-    ) {
+    if (!formData.rentalDuration || !selectedVehicle) {
       setEstimatedPrice(0);
       setDepositAmount(0);
       return;
     }
 
-    const pickup = new Date(formData.pickupTime);
-    const returnTime = new Date(formData.expectedReturnTime);
+    const duration = parseInt(formData.rentalDuration) || 1;
 
     if (formData.rentalType === "day") {
-      // Rental by day - use pricePerDay
-      const totalDays = Math.max(
-        1,
-        Math.ceil((returnTime - pickup) / (1000 * 60 * 60 * 24))
-      );
-      const price = totalDays * (selectedVehicle.pricePerDay || 0);
+      // Rental by day
+      const price = duration * (selectedVehicle.pricePerDay || 0);
       const deposit = selectedVehicle.deposit || 0;
       
       setEstimatedPrice(price);
       setDepositAmount(deposit);
     } else {
-      // Rental by hour - use pricePerHour with peak hour calculation
-      const totalHours = Math.max(
-        1,
-        Math.ceil((returnTime - pickup) / (1000 * 60 * 60))
-      );
-
-      // Calculate peak hours (5 PM - 7 PM = 17:00 - 19:00)
-      let peakHours = 0;
-      let currentTime = new Date(pickup);
-      
-      for (let i = 0; i < totalHours; i++) {
-        const hour = currentTime.getHours();
-        // Peak hours: 17:00 (5 PM) to 18:59 (before 7 PM)
-        if (hour >= 17 && hour < 19) {
-          peakHours++;
-        }
-        currentTime.setHours(currentTime.getHours() + 1);
-      }
-
-      const normalHours = totalHours - peakHours;
-      const basePrice = selectedVehicle.pricePerHour || 0;
-      const peakPrice = basePrice * 1.2; // 20% increase for peak hours
-
-      const price = (normalHours * basePrice) + (peakHours * peakPrice);
+      // Rental by hour
+      const price = duration * (selectedVehicle.pricePerHour || 0);
       const deposit = selectedVehicle.deposit || 0;
       
       setEstimatedPrice(price);
@@ -217,21 +299,28 @@ const BookVehiclePage = () => {
     }
   };
 
+  // Get minimum pickup time (30 minutes from now)
+  const getMinimumPickupTime = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 30);
+    return now.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
+  };
+
   const validateStep2 = () => {
     if (!formData.pickupStationId) {
-      toast.error("Vui lòng chọn điểm lấy xe");
+      toast.error("Vui lòng chọn điểm lấy và trả xe");
       return false;
     }
-    if (!formData.returnStationId) {
-      toast.error("Vui lòng chọn điểm trả xe");
+    if (!formData.pickupDate) {
+      toast.error("Vui lòng chọn ngày lấy xe");
       return false;
     }
     if (!formData.pickupTime) {
-      toast.error("Vui lòng chọn thời gian lấy xe");
+      toast.error("Vui lòng chọn giờ lấy xe");
       return false;
     }
-    if (!formData.expectedReturnTime) {
-      toast.error("Vui lòng chọn thời gian trả xe dự kiến");
+    if (!formData.rentalDuration || formData.rentalDuration < 1) {
+      toast.error(`Vui lòng chọn số ${formData.rentalType === 'day' ? 'ngày' : 'giờ'} thuê`);
       return false;
     }
     if (!formData.paymentMethod) {
@@ -243,16 +332,13 @@ const BookVehiclePage = () => {
       return false;
     }
 
-    const pickup = new Date(formData.pickupTime);
-    const returnTime = new Date(formData.expectedReturnTime);
+    // Validate pickup time is at least 30 minutes from now
+    const pickupDateTime = new Date(`${formData.pickupDate}T${formData.pickupTime}`);
     const now = new Date();
+    const minPickupTime = new Date(now.getTime() + 30 * 60 * 1000);
 
-    if (pickup < now) {
-      toast.error("Thời gian lấy xe phải sau hiện tại");
-      return false;
-    }
-    if (returnTime <= pickup) {
-      toast.error("Thời gian trả xe phải sau thời gian lấy xe");
+    if (pickupDateTime < minPickupTime) {
+      toast.error("Thời gian lấy xe phải sau ít nhất 30 phút kể từ bây giờ");
       return false;
     }
 
@@ -263,31 +349,31 @@ const BookVehiclePage = () => {
     try {
       setSubmitting(true);
       
-      // Calculate pricing details
-      const pickup = new Date(formData.pickupTime);
-      const returnTime = new Date(formData.expectedReturnTime);
+      // Calculate start and end date/time
+      const pickupDateTime = new Date(`${formData.pickupDate}T${formData.pickupTime}`);
+      const duration = parseInt(formData.rentalDuration) || 1;
       
-      let basePrice = 0;
-      let totalAmount = estimatedPrice;
-      
+      let endDateTime;
       if (formData.rentalType === 'day') {
-        const duration = Math.max(1, Math.ceil((returnTime - pickup) / (1000 * 60 * 60 * 24)));
-        basePrice = selectedVehicle.pricePerDay || 0;
+        // Add days
+        endDateTime = new Date(pickupDateTime);
+        endDateTime.setDate(endDateTime.getDate() + duration);
       } else {
-        const duration = Math.max(1, Math.ceil((returnTime - pickup) / (1000 * 60 * 60)));
-        basePrice = selectedVehicle.pricePerHour || 0;
+        // Add hours
+        endDateTime = new Date(pickupDateTime);
+        endDateTime.setHours(endDateTime.getHours() + duration);
       }
       
       const bookingData = {
         vehicle: formData.vehicleId,
-        station: formData.pickupStationId, // Main station reference (required)
+        station: formData.pickupStationId, // Main station reference
         pickupStation: formData.pickupStationId,
-        returnStation: formData.returnStationId,
-        startDate: formData.pickupTime,
-        endDate: formData.expectedReturnTime,
+        returnStation: formData.pickupStationId, // Same as pickup (lấy và trả cùng chỗ)
+        startDate: pickupDateTime.toISOString(),
+        endDate: endDateTime.toISOString(),
         pricing: {
-          basePrice: basePrice,
-          totalAmount: totalAmount,
+          basePrice: estimatedPrice,
+          totalAmount: estimatedPrice + depositAmount,
           deposit: depositAmount
         },
         notes: formData.notes || ""
@@ -297,16 +383,36 @@ const BookVehiclePage = () => {
       
       const response = await bookingService.create(bookingData);
       console.log("Booking response:", response);
-      toast.success("Đặt xe thành công!");
       
       // Backend returns response.data directly
       const bookingId = response.data?._id || response.data?.data?._id;
-      if (bookingId) {
-        navigate(`/renter/bookings/${bookingId}`);
-      } else {
-        console.error("No booking ID found in response");
-        navigate('/renter/bookings');
+      
+      if (!bookingId) {
+        throw new Error("Không nhận được booking ID từ server");
       }
+
+      toast.success("Tạo đơn thuê thành công! Chuyển đến thanh toán...", {
+        duration: 2000,
+      });
+
+      // Create VNPay payment URL and redirect
+      try {
+        const paymentResponse = await paymentService.createVNPayUrl(bookingId);
+        console.log("VNPay URL response:", paymentResponse);
+        
+        if (paymentResponse.success && paymentResponse.data?.paymentUrl) {
+          // Redirect to VNPay payment page
+          window.location.href = paymentResponse.data.paymentUrl;
+        } else {
+          throw new Error("Không nhận được link thanh toán VNPay");
+        }
+      } catch (paymentError) {
+        console.error("VNPay URL error:", paymentError);
+        toast.error("Không thể tạo link thanh toán. Vui lòng thử lại!");
+        // Still navigate to booking detail if payment link fails
+        navigate(`/renter/bookings/${bookingId}`);
+      }
+      
     } catch (error) {
       console.error("Booking error:", error);
       console.error("Error response:", error.response);
@@ -396,66 +502,265 @@ const BookVehiclePage = () => {
 
       {/* Step 1: Select Vehicle */}
       {step === 1 && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            Chọn xe bạn muốn thuê
-          </h2>
-
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="h-40 bg-gray-200 rounded"></div>
-                </div>
-              ))}
-            </div>
-          ) : vehicles.length === 0 ? (
-            <div className="text-center py-12">
-              <Car className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Không có xe khả dụng</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {vehicles.map((vehicle) => (
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Filters Sidebar */}
+          <aside className="lg:w-64 flex-shrink-0">
+            <div className="bg-white rounded-lg shadow-md p-6 sticky top-4">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <Filter className="w-5 h-5 mr-2" />
+                  Bộ lọc
+                </h2>
                 <button
-                  key={vehicle._id}
-                  onClick={() => handleSelectVehicle(vehicle)}
-                  className={`text-left border-2 rounded-lg p-4 transition-all ${
-                    selectedVehicle?._id === vehicle._id
-                      ? "border-primary-600 bg-primary-50"
-                      : "border-gray-200 hover:border-primary-300"
-                  }`}
+                  onClick={clearFilters}
+                  className="text-sm text-primary-600 hover:text-primary-700"
                 >
-                  <div className="h-32 bg-gray-200 rounded-lg mb-3 flex items-center justify-center">
-                    {vehicle.images?.[0] ? (
-                      <img
-                        src={vehicle.images[0]}
-                        alt={vehicle.name}
-                        className="h-full w-full object-cover rounded-lg"
-                      />
-                    ) : (
-                      <Car className="w-12 h-12 text-gray-400" />
-                    )}
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-1">
-                    {vehicle.name}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-2">
-                    {vehicle.type} • {vehicle.model}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-primary-600">
-                      {vehicle.pricePerHour?.toLocaleString("vi-VN")}đ/h
-                    </span>
-                    <span className="text-sm text-gray-600 flex items-center">
-                      <Battery className="w-4 h-4 mr-1" />
-                      {vehicle.currentBatteryLevel}%
-                    </span>
-                  </div>
+                  Xóa
                 </button>
-              ))}
+              </div>
+
+              {/* Search */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tìm kiếm
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={filters.search}
+                    onChange={(e) => handleFilterChange("search", e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Tên xe, model..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Type */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Loại xe
+                </label>
+                <select
+                  value={filters.type}
+                  onChange={(e) => handleFilterChange("type", e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="">Tất cả</option>
+                  {vehicleTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Price Range */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Giá thuê (VNĐ/giờ)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={filters.minPrice}
+                    onChange={(e) => handleFilterChange("minPrice", e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Từ"
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <input
+                    type="number"
+                    value={filters.maxPrice}
+                    onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Đến"
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Battery */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Battery className="w-4 h-4 inline mr-1" />
+                  Pin tối thiểu (%)
+                </label>
+                <input
+                  type="number"
+                  value={filters.minBattery}
+                  onChange={(e) => handleFilterChange("minBattery", e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="0-100"
+                  min="0"
+                  max="100"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Station */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <MapPin className="w-4 h-4 inline mr-1" />
+                  Điểm thuê
+                </label>
+                <select
+                  value={filters.station}
+                  onChange={(e) => handleFilterChange("station", e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="">Tất cả điểm thuê</option>
+                  {stations.map((station) => (
+                    <option key={station._id} value={station._id}>
+                      {station.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={applyFilters}
+                className="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg font-medium transition-colors"
+              >
+                Áp dụng
+              </button>
             </div>
-          )}
+          </aside>
+
+          {/* Vehicle Grid */}
+          <main className="flex-1">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">
+                Chọn xe bạn muốn thuê
+              </h2>
+
+              {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {[...Array(4)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse"
+                    >
+                      <div className="h-48 bg-gray-300"></div>
+                      <div className="p-4 space-y-3">
+                        <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : vehicles.length === 0 ? (
+                <div className="text-center py-12">
+                  <Car className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    Không tìm thấy xe
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Thử thay đổi bộ lọc hoặc tìm kiếm khác
+                  </p>
+                  <button
+                    onClick={clearFilters}
+                    className="text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    Xóa bộ lọc
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 text-gray-600">
+                    Tìm thấy {vehicles.length} xe
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {vehicles.map((vehicle) => (
+                      <button
+                        key={vehicle._id}
+                        onClick={() => handleSelectVehicle(vehicle)}
+                        className={`text-left border-2 rounded-lg overflow-hidden transition-all ${
+                          selectedVehicle?._id === vehicle._id
+                            ? "border-primary-600 shadow-lg"
+                            : "border-gray-200 hover:border-primary-300 hover:shadow-md"
+                        }`}
+                      >
+                        {/* Vehicle Image */}
+                        <div className="relative h-48 bg-gray-200">
+                          {vehicle.images?.[0] ? (
+                            <img
+                              src={vehicle.images[0]}
+                              alt={vehicle.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Car className="w-16 h-16 text-gray-400" />
+                            </div>
+                          )}
+                          
+                          {/* Selected Badge */}
+                          {selectedVehicle?._id === vehicle._id && (
+                            <div className="absolute top-2 left-2">
+                              <span className="bg-primary-600 text-white px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Đã chọn
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Status Badge */}
+                          <div className="absolute top-2 right-2">
+                            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-semibold">
+                              Sẵn sàng
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Vehicle Details */}
+                        <div className="p-4">
+                          <h3 className="font-semibold text-lg text-gray-900 mb-1">
+                            {vehicle.name}
+                          </h3>
+                          <p className="text-sm text-gray-600 mb-3">
+                            {vehicle.type} • {vehicle.model}
+                          </p>
+
+                          <div className="space-y-2 mb-4">
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Battery className="w-4 h-4 mr-2 text-primary-600" />
+                              <span>
+                                Pin: {vehicle.currentBatteryLevel}% • {vehicle.range}km
+                              </span>
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600">
+                              <MapPin className="w-4 h-4 mr-2 text-primary-600" />
+                              <span>
+                                {vehicle.currentStation?.name || "Đang cập nhật"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-4 border-t">
+                            <div>
+                              <div className="text-2xl font-bold text-primary-600">
+                                {vehicle.pricePerHour?.toLocaleString("vi-VN")}đ
+                              </div>
+                              <div className="text-xs text-gray-500">/ giờ</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-semibold text-gray-700">
+                                {vehicle.pricePerDay?.toLocaleString("vi-VN")}đ
+                              </div>
+                              <div className="text-xs text-gray-500">/ ngày</div>
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </main>
         </div>
       )}
 
@@ -589,184 +894,128 @@ const BookVehiclePage = () => {
                 </div>
               </div>
 
-              {/* Pickup Station */}
+              {/* Pickup/Return Station - Same location */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <MapPin className="w-4 h-4 inline mr-1" />
-                  Điểm lấy xe
+                  Điểm lấy và trả xe
                 </label>
-                <select
-                  name="pickupStationId"
-                  value={formData.pickupStationId}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Chọn điểm lấy xe</option>
-                  {stations.map((station) => (
-                    <option key={station._id} value={station._id}>
-                      {station.name} - {typeof station.address === 'object' 
-                        ? `${station.address.street}, ${station.address.district}, ${station.address.city}`
-                        : station.address}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Return Station */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <MapPin className="w-4 h-4 inline mr-1" />
-                  Điểm trả xe
-                </label>
-                <select
-                  name="returnStationId"
-                  value={formData.returnStationId}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Chọn điểm trả xe</option>
-                  {stations.map((station) => (
-                    <option key={station._id} value={station._id}>
-                      {station.name} - {typeof station.address === 'object' 
-                        ? `${station.address.street}, ${station.address.district}, ${station.address.city}`
-                        : station.address}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Pickup Time */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Calendar className="w-4 h-4 inline mr-1" />
-                  Thời gian lấy xe
-                </label>
-                {formData.rentalType === 'day' ? (
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50">
+                  {selectedVehicle && selectedPickupStation ? (
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Ngày</label>
+                      <p className="font-medium text-gray-900">{selectedPickupStation.name}</p>
+                      <p className="text-sm text-gray-600">
+                        {typeof selectedPickupStation.address === 'object' 
+                          ? `${selectedPickupStation.address.street}, ${selectedPickupStation.address.district}, ${selectedPickupStation.address.city}`
+                          : selectedPickupStation.address}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">Đang tải...</p>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Lấy và trả xe tại cùng một điểm (vị trí hiện tại của xe)
+                </p>
+              </div>
+
+              {/* Pickup Date and Time - 2 columns */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Calendar className="w-4 h-4 inline mr-1" />
+                    Ngày lấy xe
+                  </label>
+                  <input
+                    type="date"
+                    name="pickupDate"
+                    value={formData.pickupDate}
+                    onChange={handleInputChange}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Clock className="w-4 h-4 inline mr-1" />
+                    Giờ lấy xe
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
                       <input
-                        type="date"
-                        name="pickupDate"
-                        value={formData.pickupTime ? formData.pickupTime.split('T')[0] : ''}
+                        type="number"
+                        name="pickupHour"
+                        placeholder="Giờ"
+                        value={formData.pickupTime ? formData.pickupTime.split(':')[0] : ''}
                         onChange={(e) => {
-                          const date = e.target.value;
-                          const time = formData.pickupTime ? formData.pickupTime.split('T')[1] : '09:00';
-                          handleInputChange({ target: { name: 'pickupTime', value: `${date}T${time}` } });
+                          const hour = e.target.value;
+                          const minute = formData.pickupTime ? formData.pickupTime.split(':')[1] : '00';
+                          handleInputChange({
+                            target: {
+                              name: 'pickupTime',
+                              value: hour && minute ? `${String(hour).padStart(2, '0')}:${minute}` : ''
+                            }
+                          });
                         }}
-                        min={new Date().toISOString().split('T')[0]}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        min="1"
+                        max="24"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         required
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Giờ</label>
+                    <span className="flex items-center text-gray-500">:</span>
+                    <div className="flex-1">
                       <input
-                        type="time"
-                        name="pickupTimeOnly"
-                        value={formData.pickupTime ? formData.pickupTime.split('T')[1] : ''}
+                        type="number"
+                        name="pickupMinute"
+                        placeholder="Phút"
+                        value={formData.pickupTime ? formData.pickupTime.split(':')[1] : ''}
                         onChange={(e) => {
-                          const time = e.target.value;
-                          const date = formData.pickupTime ? formData.pickupTime.split('T')[0] : new Date().toISOString().split('T')[0];
-                          handleInputChange({ target: { name: 'pickupTime', value: `${date}T${time}` } });
+                          const minute = e.target.value;
+                          const hour = formData.pickupTime ? formData.pickupTime.split(':')[0] : '';
+                          handleInputChange({
+                            target: {
+                              name: 'pickupTime',
+                              value: hour && minute !== '' ? `${hour}:${String(minute).padStart(2, '0')}` : ''
+                            }
+                          });
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        min="0"
+                        max="59"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         required
                       />
                     </div>
                   </div>
-                ) : (
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Giờ (Hôm nay - {new Date().toLocaleDateString('vi-VN')})</label>
-                    <input
-                      type="time"
-                      name="pickupTimeOnly"
-                      value={formData.pickupTime ? formData.pickupTime.split('T')[1] : ''}
-                      onChange={(e) => {
-                        const time = e.target.value;
-                        const today = new Date().toISOString().split('T')[0];
-                        handleInputChange({ target: { name: 'pickupTime', value: `${today}T${time}` } });
-                        
-                        // Auto-set return time for same day (must be after pickup)
-                        const [pickupHour, pickupMin] = time.split(':').map(Number);
-                        const suggestedHour = Math.min(23, pickupHour + 2); // Suggest 2 hours later
-                        const suggestedTime = `${String(suggestedHour).padStart(2, '0')}:${String(pickupMin).padStart(2, '0')}`;
-                        if (!formData.expectedReturnTime || new Date(`${today}T${formData.expectedReturnTime.split('T')[1]}`) <= new Date(`${today}T${time}`)) {
-                          handleInputChange({ target: { name: 'expectedReturnTime', value: `${today}T${suggestedTime}` } });
-                        }
-                      }}
-                      min={new Date().toTimeString().slice(0, 5)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      required
-                    />
-                    <p className="text-xs text-amber-600 mt-1">* Chỉ cho thuê trong ngày hôm nay</p>
-                  </div>
-                )}
+                  <p className="text-xs text-gray-500 mt-1">Giờ: 1-24, Phút: 0-59</p>
+                </div>
               </div>
+              <p className="text-xs text-amber-600 -mt-2">
+                * Thời gian lấy xe phải sau ít nhất 30 phút kể từ bây giờ
+              </p>
 
-              {/* Expected Return Time */}
+              {/* Rental Duration - Show hours or days based on rental type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Clock className="w-4 h-4 inline mr-1" />
-                  Thời gian trả xe dự kiến
+                  {formData.rentalType === 'day' ? 'Số ngày thuê' : 'Số giờ thuê'}
                 </label>
-                {formData.rentalType === 'day' ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Ngày</label>
-                      <input
-                        type="date"
-                        name="returnDate"
-                        value={formData.expectedReturnTime ? formData.expectedReturnTime.split('T')[0] : ''}
-                        onChange={(e) => {
-                          const date = e.target.value;
-                          const time = formData.pickupTime ? formData.pickupTime.split('T')[1] : '18:00';
-                          handleInputChange({ target: { name: 'expectedReturnTime', value: `${date}T${time}` } });
-                        }}
-                        min={formData.pickupTime ? formData.pickupTime.split('T')[0] : new Date().toISOString().split('T')[0]}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Giờ (Cùng giờ lấy xe)</label>
-                      <input
-                        type="time"
-                        name="returnTimeOnly"
-                        value={formData.pickupTime ? formData.pickupTime.split('T')[1] : ''}
-                        disabled
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
-                        title="Giờ trả xe sẽ giống giờ lấy xe (thuê theo ngày)"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-xs text-blue-600">
-                        💡 Thuê theo ngày: Trả xe cùng giờ với giờ lấy xe (ví dụ: lấy 4PM hôm nay → trả 4PM ngày mai = 1 ngày)
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Giờ (Hôm nay - {new Date().toLocaleDateString('vi-VN')})</label>
-                    <input
-                      type="time"
-                      name="returnTimeOnly"
-                      value={formData.expectedReturnTime ? formData.expectedReturnTime.split('T')[1] : ''}
-                      onChange={(e) => {
-                        const time = e.target.value;
-                        const today = new Date().toISOString().split('T')[0];
-                        handleInputChange({ target: { name: 'expectedReturnTime', value: `${today}T${time}` } });
-                      }}
-                      min={formData.pickupTime ? formData.pickupTime.split('T')[1] : new Date().toTimeString().slice(0, 5)}
-                      max="23:59"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      required
-                    />
-                    <p className="text-xs text-amber-600 mt-1">* Trả xe trong ngày hôm nay, sau giờ lấy xe</p>
-                  </div>
-                )}
+                <input
+                  type="number"
+                  name="rentalDuration"
+                  value={formData.rentalDuration}
+                  onChange={handleInputChange}
+                  min="1"
+                  max={formData.rentalType === 'day' ? '30' : '24'}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {formData.rentalType === 'day' 
+                    ? 'Tối đa 30 ngày' 
+                    : 'Tối đa 24 giờ. Nếu thuê trên 24 giờ, vui lòng chọn thuê theo ngày'}
+                </p>
               </div>
 
               {/* Price Estimation */}
@@ -774,61 +1023,12 @@ const BookVehiclePage = () => {
                 <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-700">
-                      {formData.rentalType === 'day' ? 'Số ngày thuê:' : 'Thời gian thuê dự kiến:'}
+                      {formData.rentalType === 'day' ? 'Số ngày thuê:' : 'Số giờ thuê:'}
                     </span>
                     <span className="font-semibold">
-                      {(() => {
-                        const pickup = new Date(formData.pickupTime);
-                        const returnTime = new Date(formData.expectedReturnTime);
-                        
-                        if (formData.rentalType === 'day') {
-                          const totalDays = Math.max(1, Math.ceil((returnTime - pickup) / (1000 * 60 * 60 * 24)));
-                          return `${totalDays} ngày`;
-                        } else {
-                          const totalHours = Math.ceil((returnTime - pickup) / (1000 * 60 * 60));
-                          
-                          // Calculate peak hours
-                          let peakHours = 0;
-                          let currentTime = new Date(pickup);
-                          for (let i = 0; i < totalHours; i++) {
-                            const hour = currentTime.getHours();
-                            if (hour >= 17 && hour < 19) peakHours++;
-                            currentTime.setHours(currentTime.getHours() + 1);
-                          }
-                          
-                          if (peakHours > 0) {
-                            return `${totalHours} giờ (${peakHours} giờ cao điểm)`;
-                          }
-                          return `${totalHours} giờ`;
-                        }
-                      })()}
+                      {formData.rentalDuration} {formData.rentalType === 'day' ? 'ngày' : 'giờ'}
                     </span>
                   </div>
-                  {formData.rentalType === 'hour' && (() => {
-                    const pickup = new Date(formData.pickupTime);
-                    const returnTime = new Date(formData.expectedReturnTime);
-                    const totalHours = Math.ceil((returnTime - pickup) / (1000 * 60 * 60));
-                    
-                    let peakHours = 0;
-                    let currentTime = new Date(pickup);
-                    for (let i = 0; i < totalHours; i++) {
-                      const hour = currentTime.getHours();
-                      if (hour >= 17 && hour < 19) peakHours++;
-                      currentTime.setHours(currentTime.getHours() + 1);
-                    }
-                    
-                    if (peakHours > 0) {
-                      return (
-                        <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded">
-                          <p className="text-xs text-orange-800 flex items-center">
-                            <AlertCircle className="w-3 h-3 mr-1" />
-                            Giờ cao điểm (5PM-7PM): +20% giá
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-700">Tổng tiền dự kiến:</span>
                     <span className="text-xl font-bold text-primary-600">
@@ -852,35 +1052,24 @@ const BookVehiclePage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Phương thức thanh toán
                 </label>
-                <div className="space-y-3">
-                  <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <div className="p-4 border-2 border-primary-300 rounded-lg bg-primary-50">
+                  <div className="flex items-start">
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value="cash"
-                      checked={formData.paymentMethod === "cash"}
-                      onChange={handleInputChange}
+                      value="online"
+                      checked={true}
+                      readOnly
                       className="mt-1 mr-3"
                     />
                     <div className="flex-1">
-                      <div className="font-medium text-gray-900">💵 Tiền mặt</div>
-                      <p className="text-sm text-gray-600">Thanh toán bằng tiền mặt tại điểm thuê</p>
+                      <div className="font-medium text-gray-900">� Thanh toán trực tuyến</div>
+                      <p className="text-sm text-gray-600">Thanh toán qua PayOS - An toàn & Nhanh chóng</p>
+                      <p className="text-xs text-primary-600 mt-1">
+                        ✓ Hỗ trợ QR Code, ví điện tử, thẻ ATM
+                      </p>
                     </div>
-                  </label>
-                  <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="bank_transfer"
-                      checked={formData.paymentMethod === "bank_transfer"}
-                      onChange={handleInputChange}
-                      className="mt-1 mr-3"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">🏦 Chuyển khoản</div>
-                      <p className="text-sm text-gray-600">Chuyển khoản ngân hàng trước khi lấy xe</p>
-                    </div>
-                  </label>
+                  </div>
                 </div>
               </div>
 
@@ -1022,7 +1211,7 @@ const BookVehiclePage = () => {
                 <div className="flex items-start">
                   <MapPin className="w-5 h-5 text-primary-600 mr-3 mt-0.5" />
                   <div>
-                    <p className="text-sm text-gray-600">Điểm lấy xe</p>
+                    <p className="text-sm text-gray-600">Điểm lấy và trả xe</p>
                     <p className="font-medium text-gray-900">
                       {selectedPickupStation?.name}
                     </p>
@@ -1035,26 +1224,13 @@ const BookVehiclePage = () => {
                 </div>
 
                 <div className="flex items-start">
-                  <MapPin className="w-5 h-5 text-gray-400 mr-3 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-gray-600">Điểm trả xe</p>
-                    <p className="font-medium text-gray-900">
-                      {selectedReturnStation?.name}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {typeof selectedReturnStation?.address === 'object'
-                        ? `${selectedReturnStation.address.street}, ${selectedReturnStation.address.district}, ${selectedReturnStation.address.city}`
-                        : selectedReturnStation?.address}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start">
                   <Calendar className="w-5 h-5 text-primary-600 mr-3 mt-0.5" />
                   <div>
-                    <p className="text-sm text-gray-600">Thời gian lấy xe</p>
+                    <p className="text-sm text-gray-600">Ngày và giờ lấy xe</p>
                     <p className="font-medium text-gray-900">
-                      {new Date(formData.pickupTime).toLocaleString("vi-VN")}
+                      {formData.pickupDate && formData.pickupTime 
+                        ? new Date(`${formData.pickupDate}T${formData.pickupTime}`).toLocaleString("vi-VN")
+                        : 'Chưa chọn'}
                     </p>
                   </div>
                 </div>
@@ -1062,11 +1238,32 @@ const BookVehiclePage = () => {
                 <div className="flex items-start">
                   <Clock className="w-5 h-5 text-primary-600 mr-3 mt-0.5" />
                   <div>
-                    <p className="text-sm text-gray-600">Thời gian trả xe</p>
+                    <p className="text-sm text-gray-600">Thời gian thuê</p>
                     <p className="font-medium text-gray-900">
-                      {new Date(formData.expectedReturnTime).toLocaleString(
-                        "vi-VN"
-                      )}
+                      {formData.rentalDuration} {formData.rentalType === 'day' ? 'ngày' : 'giờ'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start">
+                  <Clock className="w-5 h-5 text-gray-400 mr-3 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-gray-600">Thời gian trả xe dự kiến</p>
+                    <p className="font-medium text-gray-900">
+                      {(() => {
+                        if (!formData.pickupDate || !formData.pickupTime) return 'Chưa tính';
+                        const pickupDateTime = new Date(`${formData.pickupDate}T${formData.pickupTime}`);
+                        const duration = parseInt(formData.rentalDuration) || 1;
+                        let endDateTime;
+                        if (formData.rentalType === 'day') {
+                          endDateTime = new Date(pickupDateTime);
+                          endDateTime.setDate(endDateTime.getDate() + duration);
+                        } else {
+                          endDateTime = new Date(pickupDateTime);
+                          endDateTime.setHours(endDateTime.getHours() + duration);
+                        }
+                        return endDateTime.toLocaleString("vi-VN");
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -1089,12 +1286,10 @@ const BookVehiclePage = () => {
                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <p className="text-sm text-gray-600 mb-1">Phương thức thanh toán</p>
                   <p className="font-medium text-gray-900">
-                    {formData.paymentMethod === "cash" ? "💵 Tiền mặt" : "🏦 Chuyển khoản"}
+                    💳 Thanh toán trực tuyến (VNPay)
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
-                    {formData.paymentMethod === "cash" 
-                      ? "Thanh toán tại điểm thuê" 
-                      : "Chuyển khoản trước khi lấy xe"}
+                    Thanh toán qua VNPay - An toàn & Nhanh chóng
                   </p>
                 </div>
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200">
@@ -1119,18 +1314,15 @@ const BookVehiclePage = () => {
               <div className="flex items-center justify-between mb-3">
                 <span className="text-gray-700">Giá thuê</span>
                 <span className="font-medium">
-                  {selectedVehicle?.pricePerHour?.toLocaleString("vi-VN")}đ/giờ
+                  {formData.rentalType === 'day' 
+                    ? `${selectedVehicle?.pricePerDay?.toLocaleString("vi-VN")}đ/ngày`
+                    : `${selectedVehicle?.pricePerHour?.toLocaleString("vi-VN")}đ/giờ`}
                 </span>
               </div>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-gray-700">Thời gian thuê</span>
                 <span className="font-medium">
-                  {Math.ceil(
-                    (new Date(formData.expectedReturnTime) -
-                      new Date(formData.pickupTime)) /
-                      (1000 * 60 * 60)
-                  )}{" "}
-                  giờ
+                  {formData.rentalDuration} {formData.rentalType === 'day' ? 'ngày' : 'giờ'}
                 </span>
               </div>
               <div className="border-t border-primary-200 pt-3 mb-3">
@@ -1145,7 +1337,7 @@ const BookVehiclePage = () => {
               </div>
               <div className="bg-orange-100 border border-orange-300 rounded-lg p-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-gray-900">Tiền cọc (30%)</span>
+                  <span className="font-semibold text-gray-900">Tiền cọc</span>
                   <span className="text-xl font-bold text-orange-600">
                     {depositAmount.toLocaleString("vi-VN")}đ
                   </span>
@@ -1255,6 +1447,20 @@ const BookVehiclePage = () => {
               >
                 Hủy
               </button>
+              
+              {/* Nút xem chi tiết xe */}
+              {confirmAction === 'select' && tempSelectedVehicle && (
+                <button
+                  onClick={() => {
+                    // Navigate đến trang chi tiết xe (không mở tab mới)
+                    navigate(`/vehicles/${tempSelectedVehicle._id}`);
+                  }}
+                  className="flex-1 px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 font-medium transition-colors"
+                >
+                  Xem chi tiết
+                </button>
+              )}
+              
               <button
                 onClick={confirmAction === 'select' ? confirmSelectVehicle : confirmBackToStep1}
                 className="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"

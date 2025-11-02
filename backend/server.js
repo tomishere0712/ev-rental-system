@@ -7,6 +7,7 @@ const morgan = require("morgan");
 const fs = require("fs");
 const path = require("path");
 const connectDB = require("./config/database");
+const { checkExpiredReservations } = require("./utils/bookingScheduler");
 
 // Load environment variables
 dotenv.config();
@@ -20,6 +21,9 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Connect to MongoDB
 connectDB();
+
+// Start booking reservation scheduler (auto-cancel after 5 minutes)
+checkExpiredReservations();
 
 const app = express();
 

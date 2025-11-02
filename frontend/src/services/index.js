@@ -139,6 +139,21 @@ export const paymentService = {
     return response.data;
   },
 
+  createPaymentLink: async (bookingId) => {
+    const response = await api.post("/payments/create-payment-link", { bookingId });
+    return response.data;
+  },
+
+  createVNPayUrl: async (bookingId) => {
+    const response = await api.post("/payments/create-vnpay-url", { bookingId });
+    return response.data;
+  },
+
+  handleCallback: async (data) => {
+    const response = await api.post("/payments/callback", data);
+    return response.data;
+  },
+
   getHistory: async (params) => {
     const response = await api.get("/payments", { params });
     return response.data;
