@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
-import { Bell, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 const DashboardNavbar = () => {
   const { user, logout } = useAuthStore();
@@ -15,13 +15,7 @@ const DashboardNavbar = () => {
             </div>
             <span className="text-xl font-bold text-gray-900">EV Rental</span>
           </Link>
-
           <div className="flex items-center space-x-4">
-            <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
-
             <div className="flex items-center space-x-3">
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">
