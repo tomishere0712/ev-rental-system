@@ -37,7 +37,7 @@ const AdminProfilePage = () => {
     try {
       setLoading(true);
       const response = await authService.updateProfile(formData);
-      updateUser(response.data.user);
+      updateUser(response.data);
       toast.success("Cập nhật thông tin thành công");
     } catch (error) {
       toast.error(error.response?.data?.message || "Cập nhật thất bại");

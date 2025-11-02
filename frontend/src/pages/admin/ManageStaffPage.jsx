@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { adminService } from "../../services";
-import AssignStationModal from "../../components/admin/AssignStationModal";
 import {
   UserCheck,
   Plus,
@@ -9,6 +8,8 @@ import {
   Search,
   MapPin,
   TrendingUp,
+  Building2,
+  BarChart3,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -19,8 +20,11 @@ const ManageStaffPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [editingStaff, setEditingStaff] = useState(null);
+  const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
+  const [performanceData, setPerformanceData] = useState(null);
+  const [assignStationId, setAssignStationId] = useState("");
+  const [editingStaff, setEditingStaff] = useState(null);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -105,6 +109,57 @@ const ManageStaffPage = () => {
     }
   };
 
+  const handleAssignStationClick = (staffMember) => {
+    setSelectedStaff(staffMember);
+    setAssignStationId(staffMember.assignedStation?._id || "");
+    setShowAssignModal(true);
+  };
+
+  const handleAssignStation = async (e) => {
+    e.preventDefault();
+    if (!assignStationId) {
+      toast.error("Vui lòng chọn trạm");
+      return;
+    }
+
+    try {
+      await adminService.assignStaffToStation(
+        selectedStaff._id,
+        assignStationId
+      );
+      toast.success("Assigned staff to station successfully!");
+      setShowAssignModal(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to assign staff");
+    }
+  };
+
+  const handleViewPerformance = async (staffMember) => {
+    try {
+      const data = await adminService.getStaffPerformance(staffMember._id);
+      setSelectedStaff(staffMember);
+      setPerformanceData(data?.data || data);
+      setShowPerformanceModal(true);
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Failed to load performance data"
+      );
+    }
+  };
+
+  const closeAssignModal = () => {
+    setShowAssignModal(false);
+    setSelectedStaff(null);
+    setAssignStationId("");
+  };
+
+  const closePerformanceModal = () => {
+    setShowPerformanceModal(false);
+    setSelectedStaff(null);
+    setPerformanceData(null);
+  };
+
   const closeModal = () => {
     setShowModal(false);
     setEditingStaff(null);
@@ -115,16 +170,6 @@ const ManageStaffPage = () => {
       phone: "",
       assignedStation: "",
     });
-  };
-
-  const handleAssignStation = (staffMember) => {
-    setSelectedStaff(staffMember);
-    setShowAssignModal(true);
-  };
-
-  const handleAssignSuccess = () => {
-    fetchData(); // Refresh staff list after successful assignment
-    setShowAssignModal(false);
   };
 
   const filteredStaff = staff.filter(
@@ -177,13 +222,15 @@ const ManageStaffPage = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-4">
-          <p className="text-sm text-gray-600">Total Staff</p>
-          <p className="text-2xl font-bold text-gray-900">{staff.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <p className="text-sm text-gray-600">Active Today</p>
+          <p className="text-sm text-gray-600">Active Staff</p>
           <p className="text-2xl font-bold text-green-600">
             {staff.filter((s) => s.isActive).length}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <p className="text-sm text-gray-600">Inactive Staff</p>
+          <p className="text-2xl font-bold text-red-600">
+            {staff.filter((s) => !s.isActive).length}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4">
@@ -277,8 +324,8 @@ const ManageStaffPage = () => {
                         Active
                       </span>
                     ) : (
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
-                        Offline
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                        Inactive
                       </span>
                     )}
                   </td>
@@ -292,11 +339,18 @@ const ManageStaffPage = () => {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleAssignStation(member)}
-                        className="p-2 text-green-600 hover:bg-green-50 rounded"
+                        onClick={() => handleAssignStationClick(member)}
+                        className="p-2 text-purple-600 hover:bg-purple-50 rounded"
                         title="Assign Station"
                       >
-                        <MapPin className="w-4 h-4" />
+                        <Building2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleViewPerformance(member)}
+                        className="p-2 text-green-600 hover:bg-green-50 rounded"
+                        title="View Performance"
+                      >
+                        <BarChart3 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(member._id)}
@@ -449,13 +503,160 @@ const ManageStaffPage = () => {
         </div>
       )}
 
-      {/* Modal phân công trạm */}
-      <AssignStationModal
-        staff={selectedStaff}
-        isOpen={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        onAssign={handleAssignSuccess}
-      />
+      {/* Assign Station Modal */}
+      {showAssignModal && selectedStaff && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4 flex justify-between items-center rounded-t-lg">
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Building2 className="w-5 h-5" />
+                Phân Công Nhân Viên Sang Trạm
+              </h3>
+              <button
+                onClick={closeAssignModal}
+                className="text-white hover:bg-purple-800 rounded-full p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignStation} className="p-6 space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                <p className="text-sm text-gray-600">Nhân viên:</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {selectedStaff.fullName}
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  Trạm hiện tại:{" "}
+                  {selectedStaff.assignedStation?.name || "Chưa phân công"}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chọn Trạm *
+                </label>
+                <select
+                  value={assignStationId}
+                  onChange={(e) => setAssignStationId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">-- Chọn trạm --</option>
+                  {stations.map((station) => (
+                    <option key={station._id} value={station._id}>
+                      {station.name} ({station.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+                >
+                  Phân Công
+                </button>
+                <button
+                  type="button"
+                  onClick={closeAssignModal}
+                  className="flex-1 px-4 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
+                >
+                  Hủy
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Performance Modal */}
+      {showPerformanceModal && selectedStaff && performanceData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4 flex justify-between items-center rounded-t-lg">
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Chi Tiết Performance
+              </h3>
+              <button
+                onClick={closePerformanceModal}
+                className="text-white hover:bg-green-800 rounded-full p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Nhân viên:</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {selectedStaff.fullName}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedStaff.email}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Xác Minh Khách</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {performanceData.performance?.bookingsVerified || 0}
+                  </p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Xử Lý Thanh Toán</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {performanceData.performance?.paymentsProcessed || 0}
+                  </p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Giao Xe</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {performanceData.performance?.handoversCount || 0}
+                  </p>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Nhận Xe Trả Về</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {performanceData.performance?.returnsCount || 0}
+                  </p>
+                </div>
+              </div>
+
+              {performanceData.performance?.satisfactionScore !== null && (
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-2">
+                    Điểm Hài Lòng Khách
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-yellow-500 h-2 rounded-full"
+                        style={{
+                          width: `${performanceData.performance?.satisfactionScore}%`,
+                        }}
+                      ></div>
+                    </div>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {performanceData.performance?.satisfactionScore}%
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={closePerformanceModal}
+                className="w-full px-4 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

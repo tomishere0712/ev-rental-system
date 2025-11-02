@@ -21,10 +21,63 @@ const AdminDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const data = await adminService.getOverviewStats();
-      setStats(data);
+      const [overviewRes, revenueRes, distributionRes, bookingsRes] =
+        await Promise.all([
+          adminService.getOverviewStats(),
+          adminService.getRevenueByStation(),
+          adminService.getVehicleDistribution(),
+          adminService.getRecentBookings(10),
+        ]);
+
+      // Unwrap responses - backend returns { success: true, data: {...} }
+      const overviewData = overviewRes?.data || overviewRes || {};
+      const revenueData = revenueRes?.data || revenueRes || [];
+      const distributionData = distributionRes?.data || distributionRes || [];
+      const bookingsData = bookingsRes?.data || bookingsRes || [];
+
+      // Transform distribution array to object for easier display
+      const vehicleDistribution = {};
+      distributionData.forEach((item) => {
+        vehicleDistribution[item.status] = item.count;
+      });
+
+      // Transform revenue array to object with station name and revenue
+      const revenueByStation = revenueData.map((item) => ({
+        name: item.station || item.name,
+        revenue: item.revenue,
+        bookings: item.bookings || 0,
+      }));
+
+      // Combine all data
+      const combinedStats = {
+        totalRevenue: overviewData.revenue?.total || 0,
+        revenueTrend: "+12.5%",
+        totalVehicles: overviewData.vehicles?.total || 0,
+        availableVehicles: overviewData.vehicles?.available || 0,
+        totalBookings:
+          (overviewData.bookings?.active || 0) +
+          (overviewData.bookings?.pending || 0),
+        activeBookings: overviewData.bookings?.active || 0,
+        totalUsers:
+          (overviewData.users?.renters || 0) + (overviewData.users?.staff || 0),
+        newUsersThisMonth: 0,
+        revenueByStation,
+        vehicleDistribution,
+        recentBookings: bookingsData,
+      };
+
+      setStats(combinedStats);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
+      setStats({
+        totalRevenue: 0,
+        totalVehicles: 0,
+        totalBookings: 0,
+        totalUsers: 0,
+        revenueByStation: [],
+        vehicleDistribution: {},
+        recentBookings: [],
+      });
     } finally {
       setLoading(false);
     }
@@ -81,7 +134,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+      {/*   <div className="bg-white rounded-lg shadow-md p-6 mb-8">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
           Quick Actions
         </h2>
@@ -105,7 +158,7 @@ const AdminDashboard = () => {
             + Add New Staff
           </Link>
         </div>
-      </div>
+      </div> */}
 
       {/* Recent Activity Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

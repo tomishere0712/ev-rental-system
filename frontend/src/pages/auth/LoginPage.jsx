@@ -32,9 +32,11 @@ const LoginPage = () => {
     setLoading(true);
     try {
       const response = await authService.login(formData);
+      console.log("Login response:", response);
 
       if (response.success) {
         const { token, ...user } = response.data;
+        console.log("Setting auth - token:", token, "user:", user);
         setAuth(user, token);
         toast.success("Đăng nhập thành công!");
 
