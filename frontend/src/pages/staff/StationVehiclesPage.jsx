@@ -20,21 +20,60 @@ const StationVehiclesPage = () => {
   const [issueDescription, setIssueDescription] = useState("");
   const [issueSeverity, setIssueSeverity] = useState("minor");
   const [submitting, setSubmitting] = useState(false);
+  const [station, setStation] = useState(null);
 
   useEffect(() => {
-    fetchVehicles();
+    const initializeData = async () => {
+      try {
+        const profileResponse = await staffService.getProfile();
+        if (!profileResponse.data.assignedStation) {
+          alert("Bạn chưa được phân công trạm nào");
+          return;
+        }
+        setStation(profileResponse.data.assignedStation);
+        await fetchVehicles();
+      } catch (error) {
+        console.error("Error initializing data:", error);
+        if (error.response?.status === 401) {
+          // Handle unauthorized access
+          alert("Vui lòng đăng nhập lại");
+          // You might want to redirect to login page here
+        } else if (error.response?.data?.message) {
+          alert(error.response.data.message);
+        }
+      }
+    };
+
+    initializeData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+  }, []);
+
+  useEffect(() => {
+    if (station) {
+      fetchVehicles();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, station]);
 
   const fetchVehicles = async () => {
+    if (!station) return;
+    
     try {
       setLoading(true);
-      const data = await staffService.getStationVehicles(
-        filter !== "all" ? filter : undefined
-      );
-      setVehicles(data);
+      const params = {
+        station: station._id,
+        ...(filter !== "all" ? { status: filter } : {})
+      };
+      const response = await staffService.getVehicles(params);
+      setVehicles(response.data || []);
     } catch (error) {
       console.error("Error fetching vehicles:", error);
+      if (error.response?.status === 401) {
+        alert("Vui lòng đăng nhập lại");
+        // You might want to redirect to login page here
+      } else if (error.response?.data?.message) {
+        alert(error.response.data.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -49,13 +88,13 @@ const StationVehiclesPage = () => {
         selectedVehicle._id,
         parseFloat(batteryLevel)
       );
-      alert("Battery level updated successfully");
+      alert("Cập nhật mức pin thành công");
       setShowBatteryModal(false);
       setBatteryLevel("");
       setSelectedVehicle(null);
       fetchVehicles();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to update battery level");
+      alert(error.response?.data?.message || "Không thể cập nhật mức pin");
     } finally {
       setSubmitting(false);
     }
@@ -70,14 +109,14 @@ const StationVehiclesPage = () => {
         description: issueDescription,
         severity: issueSeverity,
       });
-      alert("Issue reported successfully");
+      alert("Báo cáo sự cố thành công");
       setShowIssueModal(false);
       setIssueDescription("");
       setIssueSeverity("minor");
       setSelectedVehicle(null);
       fetchVehicles();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to report issue");
+      alert(error.response?.data?.message || "Không thể gửi báo cáo sự cố");
     } finally {
       setSubmitting(false);
     }
@@ -89,10 +128,12 @@ const StationVehiclesPage = () => {
 
     try {
       await staffService.updateVehicleStatus(vehicle._id, newStatus);
-      alert(`Vehicle status updated to ${newStatus}`);
+      alert(`Đã cập nhật trạng thái phương tiện thành ${
+        newStatus === "available" ? "sẵn sàng" : "không khả dụng"
+      }`);
       fetchVehicles();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to update vehicle status");
+      alert(error.response?.data?.message || "Không thể cập nhật trạng thái phương tiện");
     }
   };
 
@@ -124,8 +165,8 @@ const StationVehiclesPage = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Station Vehicles</h1>
-        <p className="text-gray-600 mt-2">Manage vehicles at your station</p>
+        <h1 className="text-3xl font-bold text-gray-900">Phương tiện tại trạm</h1>
+        <p className="text-gray-600 mt-2">Quản lý phương tiện tại trạm của bạn</p>
       </div>
 
       {/* Filter Tabs */}
@@ -142,12 +183,13 @@ const StationVehiclesPage = () => {
                     : "text-gray-600 hover:text-gray-900"
                 }`}
               >
-                {tab} (
-                {
-                  vehicles.filter((v) => tab === "all" || v.status === tab)
-                    .length
-                }
-                )
+                {tab === "all" ? "Tất cả" : 
+                 tab === "available" ? "Sẵn sàng" :
+                 tab === "rented" ? "Đang thuê" :
+                 tab === "maintenance" ? "Bảo trì" :
+                 "Không khả dụng"} ({
+                  vehicles.filter((v) => tab === "all" || v.status === tab).length
+                })
               </button>
             )
           )}
@@ -180,7 +222,11 @@ const StationVehiclesPage = () => {
                     vehicle.status
                   )}`}
                 >
-                  {vehicle.status}
+                  {vehicle.status === "available" ? "Sẵn sàng" :
+                   vehicle.status === "rented" ? "Đang thuê" :
+                   vehicle.status === "maintenance" ? "Bảo trì" :
+                   vehicle.status === "unavailable" ? "Không khả dụng" :
+                   vehicle.status}
                 </span>
               </div>
             </div>
@@ -202,30 +248,30 @@ const StationVehiclesPage = () => {
                     vehicle.batteryLevel
                   )}`}
                 >
-                  {vehicle.batteryLevel}% Battery
+                  {vehicle.batteryLevel}% Pin
                 </span>
               </div>
 
               {/* Vehicle Details */}
               <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
                 <div>
-                  <span className="text-gray-600">Range:</span>
+                  <span className="text-gray-600">Phạm vi:</span>
                   <span className="ml-1 font-medium">{vehicle.range} km</span>
                 </div>
                 <div>
-                  <span className="text-gray-600">Price:</span>
+                  <span className="text-gray-600">Giá thuê:</span>
                   <span className="ml-1 font-medium">
-                    ${vehicle.pricePerDay}/day
+                    {vehicle.pricePerDay?.toLocaleString()}đ/ngày
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-600">License:</span>
+                  <span className="text-gray-600">Biển số:</span>
                   <span className="ml-1 font-medium">
                     {vehicle.licensePlate}
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-600">Color:</span>
+                  <span className="text-gray-600">Màu sắc:</span>
                   <span className="ml-1 font-medium capitalize">
                     {vehicle.color}
                   </span>
@@ -243,7 +289,7 @@ const StationVehiclesPage = () => {
                   className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
                 >
                   <Battery className="w-4 h-4" />
-                  Update Battery
+                  Cập nhật pin
                 </button>
                 <button
                   onClick={() => {
@@ -253,7 +299,7 @@ const StationVehiclesPage = () => {
                   className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center justify-center gap-2"
                 >
                   <AlertTriangle className="w-4 h-4" />
-                  Report Issue
+                  Báo cáo sự cố
                 </button>
                 <button
                   onClick={() => handleStatusToggle(vehicle)}
@@ -269,12 +315,12 @@ const StationVehiclesPage = () => {
                   {vehicle.status === "available" ? (
                     <>
                       <XCircle className="w-4 h-4" />
-                      Mark Unavailable
+                      Đánh dấu không khả dụng
                     </>
                   ) : (
                     <>
                       <CheckCircle className="w-4 h-4" />
-                      Mark Available
+                      Đánh dấu sẵn sàng
                     </>
                   )}
                 </button>
@@ -287,7 +333,7 @@ const StationVehiclesPage = () => {
       {vehicles.length === 0 && (
         <div className="bg-white rounded-lg shadow-md p-12 text-center">
           <Car className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No vehicles found at your station</p>
+          <p className="text-gray-600">Không tìm thấy phương tiện nào tại trạm của bạn</p>
         </div>
       )}
 
@@ -295,14 +341,14 @@ const StationVehiclesPage = () => {
       {showBatteryModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-semibold mb-4">Update Battery Level</h3>
+            <h3 className="text-xl font-semibold mb-4">Cập nhật mức pin</h3>
             <p className="text-gray-600 mb-4">
               {selectedVehicle?.brand} {selectedVehicle?.model} -{" "}
               {selectedVehicle?.licensePlate}
             </p>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Battery Level (%)
+                Mức pin (%)
               </label>
               <input
                 type="number"
@@ -319,7 +365,7 @@ const StationVehiclesPage = () => {
                 disabled={submitting || !batteryLevel}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                {submitting ? "Updating..." : "Update"}
+                {submitting ? "Đang cập nhật..." : "Cập nhật"}
               </button>
               <button
                 onClick={() => {
@@ -329,7 +375,7 @@ const StationVehiclesPage = () => {
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
               >
-                Cancel
+                Hủy
               </button>
             </div>
           </div>
@@ -340,35 +386,35 @@ const StationVehiclesPage = () => {
       {showIssueModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-semibold mb-4">Report Vehicle Issue</h3>
+            <h3 className="text-xl font-semibold mb-4">Báo cáo sự cố phương tiện</h3>
             <p className="text-gray-600 mb-4">
               {selectedVehicle?.brand} {selectedVehicle?.model} -{" "}
               {selectedVehicle?.licensePlate}
             </p>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Issue Description
+                Mô tả sự cố
               </label>
               <textarea
                 value={issueDescription}
                 onChange={(e) => setIssueDescription(e.target.value)}
                 rows="4"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Describe the issue..."
+                placeholder="Mô tả chi tiết sự cố..."
               />
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Severity
+                Mức độ nghiêm trọng
               </label>
               <select
                 value={issueSeverity}
                 onChange={(e) => setIssueSeverity(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="minor">Minor</option>
-                <option value="moderate">Moderate</option>
-                <option value="severe">Severe</option>
+                <option value="minor">Nhẹ</option>
+                <option value="moderate">Trung bình</option>
+                <option value="severe">Nghiêm trọng</option>
               </select>
             </div>
             <div className="flex gap-3">
@@ -377,7 +423,7 @@ const StationVehiclesPage = () => {
                 disabled={submitting || !issueDescription}
                 className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50"
               >
-                {submitting ? "Reporting..." : "Report Issue"}
+                {submitting ? "Đang gửi..." : "Gửi báo cáo"}
               </button>
               <button
                 onClick={() => {
@@ -388,7 +434,7 @@ const StationVehiclesPage = () => {
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
               >
-                Cancel
+                Hủy
               </button>
             </div>
           </div>

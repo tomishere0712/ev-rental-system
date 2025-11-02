@@ -40,5 +40,7 @@ router.get("/verifications/rejected", staffController.getRejectedVerifications);
 // ✅ Nhân viên xác minh (phê duyệt / từ chối)
 router.patch("/verifications/:userId", staffController.verifyUserDocuments);
 
+// ✅ Xem xét lại hồ sơ đã được phê duyệt hoặc từ chối
+router.patch("/verifications/:userId/reconsider", staffController.reconsiderVerification);
 
 module.exports = router;

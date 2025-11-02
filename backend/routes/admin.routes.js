@@ -40,6 +40,7 @@ router.put("/users/:id/block", adminController.blockUser);
 router.get("/staff", adminController.getAllStaff);
 router.post("/staff", adminController.createStaff);
 router.put("/staff/:id", adminController.updateStaff);
+router.put("/staff/:id/assign-station", adminController.assignStaffToStation);
 router.delete("/staff/:id", adminController.deleteStaff);
 router.get("/staff/:id/performance", adminController.getStaffPerformance);
 
