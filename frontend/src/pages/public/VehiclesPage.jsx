@@ -2,9 +2,13 @@ import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Search, Filter, Battery, MapPin, Car } from "lucide-react";
 import { vehicleService, stationService } from "../../services";
+import { useAuthStore } from "../../store/authStore";
 import toast from "react-hot-toast";
 
 const VehiclesPage = () => {
+  const user = useAuthStore(state => state.user);
+  const isStaffOrAdmin = user && (user.role === "staff" || user.role === "admin");
+  
   const [searchParams, setSearchParams] = useSearchParams();
   const [vehicles, setVehicles] = useState([]);
   const [stations, setStations] = useState([]);
@@ -298,10 +302,11 @@ const VehiclesPage = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {vehicles.map((vehicle) => (
-                    <Link
+                    <div
                       key={vehicle._id}
-                      to={`/vehicles/${vehicle._id}`}
-                      className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow"
+                      className={`bg-white rounded-lg shadow-md overflow-hidden ${
+                        !isStaffOrAdmin && "hover:shadow-xl transition-shadow"
+                      }`}
                     >
                       <div className="relative h-48 bg-gray-200">
                         {vehicle.images && vehicle.images[0] ? (
@@ -365,12 +370,18 @@ const VehiclesPage = () => {
                             </div>
                             <div className="text-xs text-gray-500">/ giờ</div>
                           </div>
-                          <button className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-                            Thuê ngay
-                          </button>
+                          <Link to={`/vehicles/${vehicle._id}`}>
+                            <button className={`${
+                              isStaffOrAdmin 
+                                ? "bg-gray-600 hover:bg-gray-700"
+                                : "bg-primary-600 hover:bg-primary-700"
+                            } text-white px-4 py-2 rounded-lg font-medium transition-colors`}>
+                              {isStaffOrAdmin ? "Xem chi tiết" : "Thuê ngay"}
+                            </button>
+                          </Link>
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
 

@@ -11,7 +11,9 @@ import {
   AlertCircle,
   ArrowLeft,
   Car,
+  
 } from "lucide-react";
+import { useAuthStore } from "../../store/authStore";
 import { vehicleService } from "../../services";
 import toast from "react-hot-toast";
 
@@ -21,6 +23,7 @@ const VehicleDetailPage = () => {
   const [vehicle, setVehicle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
+  const { user } = useAuthStore();
 
   useEffect(() => {
     const fetchVehicleDetails = async () => {
@@ -384,92 +387,93 @@ const VehicleDetailPage = () => {
             </div>
           </div>
 
-          {/* Right Column - Booking Card */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-6 sticky top-24">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  Giá thuê
-                </h2>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Theo giờ</span>
-                    <span className="text-2xl font-bold text-primary-600">
-                      {vehicle.pricePerHour?.toLocaleString()}đ
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Theo ngày</span>
-                    <span className="text-xl font-bold text-gray-900">
-                      {vehicle.pricePerDay?.toLocaleString()}đ
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-6 pb-6 border-b">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Đặt cọc</span>
-                  <span className="font-medium text-gray-900">
-                    {vehicle.deposit?.toLocaleString()}đ
-                  </span>
-                </div>
-              </div>
-
-              {vehicle.status === "available" ? (
-                <>
-                  <button
-                    onClick={handleBooking}
-                    className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors mb-3"
-                  >
-                    <Calendar className="w-5 h-5 inline-block mr-2" />
-                    Đặt xe ngay
-                  </button>
-                  <p className="text-xs text-gray-500 text-center">
-                    Miễn phí hủy trong 24 giờ
-                  </p>
-                </>
-              ) : (
-                <div className="text-center py-4">
-                  <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-600 font-medium mb-2">
-                    Xe hiện không khả dụng
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {vehicle.status === "rented"
-                      ? "Xe đang được thuê bởi khách hàng khác"
-                      : vehicle.status === "maintenance"
-                      ? "Xe đang trong quá trình bảo trì"
-                      : vehicle.status === "charging"
-                      ? "Xe đang được sạc pin"
-                      : "Vui lòng chọn xe khác"}
-                  </p>
-                  <Link
-                    to="/vehicles"
-                    className="inline-block mt-4 text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    Xem xe khác
-                  </Link>
-                </div>
-              )}
-
-              {/* Additional Info */}
-              <div className="mt-6 pt-6 border-t space-y-3 text-sm text-gray-600">
-                <div className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                  <span>Bảo hiểm toàn diện</span>
-                </div>
-                <div className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                  <span>Hỗ trợ 24/7</span>
-                </div>
-                <div className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                  <span>Miễn phí sạc tại điểm thuê</span>
-                </div>
-              </div>
-            </div>
+{/* Right Column */}
+{user?.role !== "staff" && user?.role !== "admin" && (
+  <div className="lg:col-span-1">
+    <div className="bg-white rounded-lg shadow-md p-6 sticky top-24">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Giá thuê</h2>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-600">Theo giờ</span>
+            <span className="text-2xl font-bold text-primary-600">
+              {vehicle.pricePerHour?.toLocaleString()}đ
+            </span>
           </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-600">Theo ngày</span>
+            <span className="text-xl font-bold text-gray-900">
+              {vehicle.pricePerDay?.toLocaleString()}đ
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6 pb-6 border-b">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-600">Đặt cọc</span>
+          <span className="font-medium text-gray-900">
+            {vehicle.deposit?.toLocaleString()}đ
+          </span>
+        </div>
+      </div>
+
+      {vehicle.status === "available" ? (
+        <>
+          <button
+            onClick={handleBooking}
+            className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors mb-3"
+          >
+            <Calendar className="w-5 h-5 inline-block mr-2" />
+            Đặt xe ngay
+          </button>
+          <p className="text-xs text-gray-500 text-center">
+            Miễn phí hủy trong 24 giờ
+          </p>
+        </>
+      ) : (
+        <div className="text-center py-4">
+          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <p className="text-gray-600 font-medium mb-2">
+            Xe hiện không khả dụng
+          </p>
+          <p className="text-sm text-gray-500">
+            {vehicle.status === "rented"
+              ? "Xe đang được thuê bởi khách hàng khác"
+              : vehicle.status === "maintenance"
+              ? "Xe đang trong quá trình bảo trì"
+              : vehicle.status === "charging"
+              ? "Xe đang được sạc pin"
+              : "Vui lòng chọn xe khác"}
+          </p>
+          <Link
+            to="/vehicles"
+            className="inline-block mt-4 text-primary-600 hover:text-primary-700 font-medium"
+          >
+            Xem xe khác
+          </Link>
+        </div>
+      )}
+
+      {/* Additional Info */}
+      <div className="mt-6 pt-6 border-t space-y-3 text-sm text-gray-600">
+        <div className="flex items-start">
+          <CheckCircle className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+          <span>Bảo hiểm toàn diện</span>
+        </div>
+        <div className="flex items-start">
+          <CheckCircle className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+          <span>Hỗ trợ 24/7</span>
+        </div>
+        <div className="flex items-start">
+          <CheckCircle className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+          <span>Miễn phí sạc tại điểm thuê</span>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
         </div>
       </div>
     </div>

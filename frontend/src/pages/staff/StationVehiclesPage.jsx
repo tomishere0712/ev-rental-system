@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { staffService } from "../../services";
+import toast, { Toaster } from "react-hot-toast";
 import {
   Car,
   Battery,
@@ -16,7 +17,7 @@ const StationVehiclesPage = () => {
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [showBatteryModal, setShowBatteryModal] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
-  const [batteryLevel, setBatteryLevel] = useState("");
+  const [currentBatteryLevel, setCurrentBatteryLevel] = useState("");
   const [issueDescription, setIssueDescription] = useState("");
   const [issueSeverity, setIssueSeverity] = useState("minor");
   const [submitting, setSubmitting] = useState(false);
@@ -27,7 +28,9 @@ const StationVehiclesPage = () => {
       try {
         const profileResponse = await staffService.getProfile();
         if (!profileResponse.data.assignedStation) {
-          alert("Bạn chưa được phân công trạm nào");
+          toast("Bạn chưa được phân công trạm nào", {
+            icon: '⚠️',
+          });
           return;
         }
         setStation(profileResponse.data.assignedStation);
@@ -36,10 +39,10 @@ const StationVehiclesPage = () => {
         console.error("Error initializing data:", error);
         if (error.response?.status === 401) {
           // Handle unauthorized access
-          alert("Vui lòng đăng nhập lại");
+          toast.error("Vui lòng đăng nhập lại");
           // You might want to redirect to login page here
         } else if (error.response?.data?.message) {
-          alert(error.response.data.message);
+          toast.error(error.response.data.message);
         }
       }
     };
@@ -55,24 +58,27 @@ const StationVehiclesPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, station]);
 
+  const [allVehicles, setAllVehicles] = useState([]); // Thêm state mới để lưu tất cả xe
+
   const fetchVehicles = async () => {
     if (!station) return;
     
     try {
       setLoading(true);
       const params = {
-        station: station._id,
-        ...(filter !== "all" ? { status: filter } : {})
+        station: station._id
       };
       const response = await staffService.getVehicles(params);
-      setVehicles(response.data || []);
+      const fetchedVehicles = response.data || [];
+      setAllVehicles(fetchedVehicles); // Lưu tất cả xe vào state riêng
+      // Chỉ hiển thị xe theo filter
+      setVehicles(filter === "all" ? fetchedVehicles : fetchedVehicles.filter(v => v.status === filter));
     } catch (error) {
       console.error("Error fetching vehicles:", error);
       if (error.response?.status === 401) {
-        alert("Vui lòng đăng nhập lại");
-        // You might want to redirect to login page here
+        toast.error("Vui lòng đăng nhập lại");
       } else if (error.response?.data?.message) {
-        alert(error.response.data.message);
+        toast.error(error.response.data.message);
       }
     } finally {
       setLoading(false);
@@ -80,21 +86,23 @@ const StationVehiclesPage = () => {
   };
 
   const handleUpdateBattery = async () => {
-    if (!selectedVehicle || !batteryLevel) return;
+    if (!selectedVehicle || !currentBatteryLevel) return;
 
     setSubmitting(true);
     try {
-      await staffService.updateVehicleBattery(
+      await staffService.updateBattery(
         selectedVehicle._id,
-        parseFloat(batteryLevel)
+        { batteryLevel: parseFloat(currentBatteryLevel) }
       );
-      alert("Cập nhật mức pin thành công");
+      toast.success("Cập nhật mức pin thành công", {
+        icon: '🔋',
+      });
       setShowBatteryModal(false);
-      setBatteryLevel("");
+      setCurrentBatteryLevel("");
       setSelectedVehicle(null);
       fetchVehicles();
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể cập nhật mức pin");
+      toast.error(error.response?.data?.message || "Không thể cập nhật mức pin");
     } finally {
       setSubmitting(false);
     }
@@ -109,14 +117,16 @@ const StationVehiclesPage = () => {
         description: issueDescription,
         severity: issueSeverity,
       });
-      alert("Báo cáo sự cố thành công");
+      toast.success("Báo cáo sự cố thành công", {
+        icon: '⚠️',
+      });
       setShowIssueModal(false);
       setIssueDescription("");
       setIssueSeverity("minor");
       setSelectedVehicle(null);
       fetchVehicles();
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể gửi báo cáo sự cố");
+      toast.error(error.response?.data?.message || "Không thể gửi báo cáo sự cố");
     } finally {
       setSubmitting(false);
     }
@@ -128,12 +138,14 @@ const StationVehiclesPage = () => {
 
     try {
       await staffService.updateVehicleStatus(vehicle._id, newStatus);
-      alert(`Đã cập nhật trạng thái phương tiện thành ${
+      toast.success(`Đã cập nhật trạng thái phương tiện thành ${
         newStatus === "available" ? "sẵn sàng" : "không khả dụng"
-      }`);
+      }`, {
+        icon: newStatus === "available" ? '✅' : '❌',
+      });
       fetchVehicles();
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể cập nhật trạng thái phương tiện");
+      toast.error(error.response?.data?.message || "Không thể cập nhật trạng thái phương tiện");
     }
   };
 
@@ -164,6 +176,26 @@ const StationVehiclesPage = () => {
 
   return (
     <div className="p-6">
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            style: {
+              background: 'green',
+            },
+          },
+          error: {
+            style: {
+              background: 'red',
+            },
+          },
+        }}
+      />
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Phương tiện tại trạm</h1>
         <p className="text-gray-600 mt-2">Quản lý phương tiện tại trạm của bạn</p>
@@ -171,27 +203,32 @@ const StationVehiclesPage = () => {
 
       {/* Filter Tabs */}
       <div className="bg-white rounded-lg shadow-md mb-6">
-        <div className="flex border-b">
+        <div className="flex border-b overflow-x-auto">
           {["all", "available", "rented", "maintenance", "unavailable"].map(
-            (tab) => (
-              <button
-                key={tab}
-                onClick={() => setFilter(tab)}
-                className={`px-6 py-3 font-medium capitalize ${
-                  filter === tab
-                    ? "border-b-2 border-blue-600 text-blue-600"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                {tab === "all" ? "Tất cả" : 
-                 tab === "available" ? "Sẵn sàng" :
-                 tab === "rented" ? "Đang thuê" :
-                 tab === "maintenance" ? "Bảo trì" :
-                 "Không khả dụng"} ({
-                  vehicles.filter((v) => tab === "all" || v.status === tab).length
-                })
-              </button>
-            )
+            (tab) => {
+              // Tính toán số lượng xe cho mỗi trạng thái dựa trên tất cả xe
+              const count = tab === "all" 
+                ? allVehicles.length 
+                : allVehicles.filter(v => v.status === tab).length;
+              
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setFilter(tab)}
+                  className={`px-6 py-3 font-medium capitalize whitespace-nowrap ${
+                    filter === tab
+                      ? "border-b-2 border-blue-600 text-blue-600"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  {tab === "all" ? "Tất cả" : 
+                   tab === "available" ? "Sẵn sàng" :
+                   tab === "rented" ? "Đang thuê" :
+                   tab === "maintenance" ? "Bảo trì" :
+                   "Không khả dụng"} ({count})
+                </button>
+              );
+            }
           )}
         </div>
       </div>
@@ -241,14 +278,14 @@ const StationVehiclesPage = () => {
               {/* Battery Level */}
               <div className="flex items-center gap-2 mb-3">
                 <Battery
-                  className={`w-5 h-5 ${getBatteryColor(vehicle.batteryLevel)}`}
+                  className={`w-5 h-5 ${getBatteryColor(vehicle.currentBatteryLevel)}`}
                 />
                 <span
                   className={`text-sm font-medium ${getBatteryColor(
-                    vehicle.batteryLevel
+                    vehicle.currentBatteryLevel
                   )}`}
                 >
-                  {vehicle.batteryLevel}% Pin
+                  {vehicle.currentBatteryLevel}% Pin
                 </span>
               </div>
 
@@ -270,12 +307,12 @@ const StationVehiclesPage = () => {
                     {vehicle.licensePlate}
                   </span>
                 </div>
-                <div>
+                {/* <div>
                   <span className="text-gray-600">Màu sắc:</span>
                   <span className="ml-1 font-medium capitalize">
                     {vehicle.color}
                   </span>
-                </div>
+                </div> */}
               </div>
 
               {/* Action Buttons */}
@@ -283,7 +320,7 @@ const StationVehiclesPage = () => {
                 <button
                   onClick={() => {
                     setSelectedVehicle(vehicle);
-                    setBatteryLevel(vehicle.batteryLevel.toString());
+                    setCurrentBatteryLevel(vehicle.currentBatteryLevel.toString());
                     setShowBatteryModal(true);
                   }}
                   className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
@@ -354,15 +391,15 @@ const StationVehiclesPage = () => {
                 type="number"
                 min="0"
                 max="100"
-                value={batteryLevel}
-                onChange={(e) => setBatteryLevel(e.target.value)}
+                value={currentBatteryLevel}
+                onChange={(e) => setCurrentBatteryLevel(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div className="flex gap-3">
               <button
                 onClick={handleUpdateBattery}
-                disabled={submitting || !batteryLevel}
+                disabled={submitting || !currentBatteryLevel}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {submitting ? "Đang cập nhật..." : "Cập nhật"}
@@ -370,7 +407,7 @@ const StationVehiclesPage = () => {
               <button
                 onClick={() => {
                   setShowBatteryModal(false);
-                  setBatteryLevel("");
+                  setCurrentBatteryLevel("");
                   setSelectedVehicle(null);
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"

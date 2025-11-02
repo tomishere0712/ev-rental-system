@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
 import { useAuthRefresh } from "./hooks/useAuthRefresh";
+import toast from "react-hot-toast";
 
 // Layouts
 import MainLayout from "./layouts/MainLayout";
@@ -47,11 +48,19 @@ function App() {
   // Protected Route Component
   /* eslint-disable react/prop-types */
   const ProtectedRoute = ({ children, allowedRoles }) => {
+    // Nếu allowedRoles chứa null (cho phép người chưa đăng nhập) và người dùng chưa đăng nhập
+    if (allowedRoles?.includes(null) && !user) {
+      return children;
+    }
+
+    // Nếu cần đăng nhập nhưng chưa đăng nhập
     if (!user) {
       return <Navigate to="/login" replace />;
     }
 
+    // Nếu đã đăng nhập nhưng không có quyền
     if (allowedRoles && !allowedRoles.includes(user.role)) {
+      toast.error("Bạn không có quyền truy cập trang này");
       return <Navigate to="/" replace />;
     }
 

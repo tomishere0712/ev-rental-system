@@ -195,10 +195,8 @@ export const staffService = {
     return response.data;
   },
 
-  updateBattery: async (id, batteryLevel) => {
-    const response = await api.put(`/staff/vehicles/${id}/battery`, {
-      batteryLevel,
-    });
+  updateBattery: async (id, data) => {
+    const response = await api.put(`/staff/vehicles/${id}/battery`, data);
     return response.data;
   },
 
@@ -239,11 +237,6 @@ export const staffService = {
 
   getRejectedVerifications: async () => {
     const response = await api.get("/staff/verifications/rejected");
-    return response.data;
-  },
-
-  reconsiderVerification: async (userId, data) => {
-    const response = await api.patch(`/staff/verifications/${userId}/reconsider`, data);
     return response.data;
   },
 
