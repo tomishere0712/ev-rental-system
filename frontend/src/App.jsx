@@ -39,6 +39,10 @@ import ManageStaffPage from "./pages/admin/ManageStaffPage";
 import ReportsPage from "./pages/admin/ReportsPage";
 import AdminProfilePage from "./pages/admin/AdminProfilePage";
 
+// Payment Pages
+import PaymentSandboxPage from "./pages/payment/PaymentSandboxPage";
+import PaymentResultPage from "./pages/payment/PaymentResultPage";
+
 function App() {
   const { user } = useAuthStore();
   
@@ -81,6 +85,11 @@ function App() {
       {/* Auth Routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+
+      {/* Payment Routes (Public for callback) */}
+      <Route path="/payment/sandbox" element={<PaymentSandboxPage />} />
+      <Route path="/payment/success" element={<PaymentResultPage />} />
+      <Route path="/payment/failed" element={<PaymentResultPage />} />
 
       {/* Renter Routes */}
       <Route

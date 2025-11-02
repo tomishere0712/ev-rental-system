@@ -52,20 +52,22 @@ const RenterDashboard = () => {
       });
       const allBookings = allBookingsResponse.data || [];
 
-      // Calculate total spent
-      const totalSpent = allBookings.reduce(
-        (sum, b) => sum + (b.pricing?.totalAmount || 0),
-        0
-      );
+      // Calculate total spent - only count bookings that have been paid (pending, confirmed, in-progress, completed)
+      const paidStatuses = ['pending', 'confirmed', 'in-progress', 'completed'];
+      const paidBookings = allBookings.filter(b => paidStatuses.includes(b.status));
       
-      // Count unique vehicles
+      const totalSpent = paidBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
+      
+      // Count unique vehicles - only count paid bookings
       const uniqueVehicles = new Set(
-        allBookings.filter(b => b.vehicle?._id).map((b) => b.vehicle._id)
+        paidBookings
+          .filter(b => b.vehicle?._id)
+          .map((b) => b.vehicle._id)
       ).size;
 
       setStats({
         activeBookings: bookings.length,
-        totalBookings: allBookings.length,
+        totalBookings: paidBookings.length, // Only count paid bookings
         totalSpent: totalSpent,
         vehiclesRented: uniqueVehicles,
       });
@@ -167,9 +169,9 @@ const RenterDashboard = () => {
             <span className="text-sm text-gray-500">Chi tiêu</span>
           </div>
           <div className="text-3xl font-bold text-gray-900 mb-1">
-            {loading ? "..." : `${(stats.totalSpent / 1000000).toFixed(1)}M`}
+            {loading ? "..." : `${stats.totalSpent.toLocaleString("vi-VN")}đ`}
           </div>
-          <p className="text-sm text-gray-600">Tổng chi tiêu (VNĐ)</p>
+          <p className="text-sm text-gray-600">Tổng chi tiêu</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">

@@ -22,13 +22,13 @@ exports.createBooking = async (req, res) => {
       return res.status(400).json({ message: "Xe không khả dụng" });
     }
 
-    // Check for overlapping bookings (pending, confirmed, or in-progress)
+    // Check for overlapping bookings (reserved, pending, confirmed, or in-progress)
     const start = new Date(startDate);
     const end = new Date(endDate);
     
     const overlappingBooking = await Booking.findOne({
       vehicle,
-      status: { $in: ["pending", "confirmed", "in-progress"] },
+      status: { $in: ["reserved", "pending", "confirmed", "in-progress"] },
       $or: [
         // New booking starts during existing booking
         { startDate: { $lte: start }, endDate: { $gt: start } },
@@ -62,7 +62,10 @@ exports.createBooking = async (req, res) => {
     const bookingNumber = `BK${Date.now()}${String(count + 1).padStart(4, "0")}`;
     console.log("Generated bookingNumber:", bookingNumber);
 
-    // Create booking
+    // Calculate reservation timeout (5 minutes from now)
+    const reservedUntil = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    // Create booking with "reserved" status
     const booking = new Booking({
       bookingNumber,
       renter: req.user.id,
@@ -77,15 +80,16 @@ exports.createBooking = async (req, res) => {
         deposit: vehicleDoc.deposit,
         totalAmount: basePrice + vehicleDoc.deposit,
       },
-      status: "pending",
+      status: "reserved", // Giữ chỗ trong 5 phút
+      reservedUntil,
     });
     await booking.save();
-    console.log("✅ Booking saved successfully:", bookingNumber);
+    console.log("✅ Booking saved successfully:", bookingNumber, "- Reserved until:", reservedUntil);
 
-    // Update vehicle status to reserved when booking is created
-    vehicleDoc.status = "reserved";
-    await vehicleDoc.save();
-    console.log("✅ Vehicle status updated to: reserved");
+    // Update vehicle status to "reserved" ngay khi giữ chỗ
+    // Nếu hết 5 phút không thanh toán, scheduler sẽ hủy booking và cần trả xe về "available"
+    await Vehicle.findByIdAndUpdate(vehicle, { status: "reserved" });
+    console.log("✅ Vehicle status updated to: reserved (holding for 5 minutes)");
 
     // Populate booking details
     const populatedBooking = await Booking.findById(booking._id)
@@ -96,7 +100,7 @@ exports.createBooking = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Đặt xe thành công",
+      message: "Đặt xe thành công - Vui lòng thanh toán để xác nhận",
       data: populatedBooking,
     });
   } catch (error) {
@@ -115,7 +119,11 @@ exports.getMyBookings = async (req, res) => {
   try {
     const { status, page = 1, limit = 10 } = req.query;
 
-    const filter = { renter: req.user.id };
+    const filter = { 
+      renter: req.user.id,
+      // Hiện tất cả trạng thái - không filter cancelled nữa
+    };
+    
     if (status) filter.status = status;
 
     const skip = (page - 1) * limit;
