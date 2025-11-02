@@ -27,7 +27,9 @@ exports.register = async (req, res) => {
     if (phone) {
       const phoneExists = await User.findOne({ phone });
       if (phoneExists) {
-        return res.status(400).json({ message: "Số điện thoại đã được sử dụng" });
+        return res
+          .status(400)
+          .json({ message: "Số điện thoại đã được sử dụng" });
       }
     }
 
@@ -147,25 +149,25 @@ exports.getMe = async (req, res) => {
 exports.uploadDocuments = async (req, res) => {
   try {
     if (!req.files || (!req.files.driverLicense && !req.files.nationalId)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Vui lòng upload đầy đủ 2 giấy tờ" 
+        message: "Vui lòng upload đầy đủ 2 giấy tờ",
       });
     }
 
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "Người dùng không tồn tại" 
+        message: "Người dùng không tồn tại",
       });
     }
 
     // Kiểm tra nếu đang pending thì không cho upload lại
     if (user.verificationStatus === "pending") {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Hồ sơ đang được xét duyệt. Vui lòng chờ kết quả." 
+        message: "Hồ sơ đang được xét duyệt. Vui lòng chờ kết quả.",
       });
     }
 
@@ -182,7 +184,7 @@ exports.uploadDocuments = async (req, res) => {
           resource_type: "image",
         });
         driverLicenseImages.push(result.secure_url);
-        
+
         // Delete temporary file
         fs.unlinkSync(file.path);
       }
@@ -207,7 +209,7 @@ exports.uploadDocuments = async (req, res) => {
           resource_type: "image",
         });
         nationalIdImages.push(result.secure_url);
-        
+
         // Delete temporary file
         fs.unlinkSync(file.path);
       }
@@ -237,9 +239,9 @@ exports.uploadDocuments = async (req, res) => {
     });
   } catch (error) {
     console.error("Upload documents error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: error.message 
+      message: error.message,
     });
   }
 };
@@ -276,5 +278,72 @@ exports.updateProfile = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Change password
+// @route   PUT /api/auth/change-password
+// @access  Private
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng cung cấp đầy đủ thông tin mật khẩu",
+      });
+    }
+
+    // Check password length
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Mật khẩu mới phải có ít nhất 6 ký tự",
+      });
+    }
+
+    // Get user with password field
+    const user = await User.findById(req.user.id).select("+password");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy người dùng",
+      });
+    }
+
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Mật khẩu hiện tại không đúng",
+      });
+    }
+
+    // Check if new password is same as old password
+    const isSameAsOld = await user.comparePassword(newPassword);
+    if (isSameAsOld) {
+      return res.status(400).json({
+        success: false,
+        message: "Mật khẩu mới không được trùng với mật khẩu cũ",
+      });
+    }
+
+    // Update password (will be hashed by pre-save hook)
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Đổi mật khẩu thành công. Vui lòng đăng nhập lại.",
+    });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi đổi mật khẩu",
+    });
   }
 };

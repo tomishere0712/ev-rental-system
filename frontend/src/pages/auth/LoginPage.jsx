@@ -35,11 +35,6 @@ const LoginPage = () => {
 
       if (response.success) {
         const { token, ...user } = response.data;
-        console.log("Login response user data:", user);
-        console.log("User verificationStatus:", user.verificationStatus);
-        console.log("User driverLicense:", user.driverLicense);
-        console.log("User nationalId:", user.nationalId);
-        
         setAuth(user, token);
         toast.success("Đăng nhập thành công!");
 
@@ -113,19 +108,22 @@ const LoginPage = () => {
         }
       } else if (error.request) {
         // Không nhận được phản hồi từ server
-        toast.error("Không thể kết nối tới server! Vui lòng kiểm tra kết nối.", {
-          duration: 5000,
-          icon: "🌐",
-          style: {
-            background: "#ef4444",
-            color: "#fff",
-            padding: "16px",
-            borderRadius: "10px",
-            fontSize: "15px",
-            fontWeight: "600",
-            boxShadow: "0 4px 12px rgba(239, 68, 68, 0.4)",
-          },
-        });
+        toast.error(
+          "Không thể kết nối tới server! Vui lòng kiểm tra kết nối.",
+          {
+            duration: 5000,
+            icon: "🌐",
+            style: {
+              background: "#ef4444",
+              color: "#fff",
+              padding: "16px",
+              borderRadius: "10px",
+              fontSize: "15px",
+              fontWeight: "600",
+              boxShadow: "0 4px 12px rgba(239, 68, 68, 0.4)",
+            },
+          }
+        );
       } else {
         // Lỗi khác
         toast.error("Đã xảy ra lỗi! Vui lòng thử lại.", {

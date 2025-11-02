@@ -32,6 +32,7 @@ const Sidebar = () => {
     { to: "/staff/verify", icon: UserCheck, label: "Xác thực khách hàng" },
     { to: "/staff/vehicles", icon: Car, label: "Xe tại điểm" },
     { to: "/staff/payment", icon: CreditCard, label: "Thanh toán" },
+    { to: "/staff/profile", icon: User, label: "Hồ sơ" },
   ];
 
   const adminLinks = [
@@ -41,6 +42,7 @@ const Sidebar = () => {
     { to: "/admin/users", icon: Users, label: "Quản lý khách hàng" },
     { to: "/admin/staff", icon: UserCheck, label: "Quản lý nhân viên" },
     { to: "/admin/reports", icon: FileText, label: "Báo cáo" },
+    { to: "/admin/profile", icon: User, label: "Hồ sơ" },
   ];
 
   const getLinks = () => {
