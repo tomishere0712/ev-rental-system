@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
+import { useAuthRefresh } from "./hooks/useAuthRefresh";
 
 // Layouts
 import MainLayout from "./layouts/MainLayout";
@@ -19,7 +20,6 @@ import BookVehiclePage from "./pages/renter/BookVehiclePage";
 import MyBookingsPage from "./pages/renter/MyBookingsPage";
 import BookingDetailPage from "./pages/renter/BookingDetailPage";
 import RenterProfilePage from "./pages/renter/RenterProfilePage";
-import RentalHistoryPage from "./pages/renter/RentalHistoryPage";
 
 // Staff Pages
 import StaffDashboard from "./pages/staff/StaffDashboard";
@@ -40,6 +40,9 @@ import AdminProfilePage from "./pages/admin/AdminProfilePage";
 
 function App() {
   const { user } = useAuthStore();
+  
+  // Auto-refresh user data on app mount/reload
+  useAuthRefresh();
 
   // Protected Route Component
   /* eslint-disable react/prop-types */
@@ -83,7 +86,6 @@ function App() {
         <Route path="/renter/bookings" element={<MyBookingsPage />} />
         <Route path="/renter/bookings/:id" element={<BookingDetailPage />} />
         <Route path="/renter/profile" element={<RenterProfilePage />} />
-        <Route path="/renter/history" element={<RentalHistoryPage />} />
       </Route>
 
       {/* Staff Routes */}

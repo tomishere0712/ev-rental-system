@@ -21,8 +21,7 @@ const Sidebar = () => {
   const renterLinks = [
     { to: "/renter/dashboard", icon: LayoutDashboard, label: "Tổng quan" },
     { to: "/renter/book", icon: Calendar, label: "Đặt xe" },
-    { to: "/renter/bookings", icon: FileText, label: "Đơn thuê của tôi" },
-    { to: "/renter/history", icon: History, label: "Lịch sử" },
+    { to: "/renter/bookings", icon: FileText, label: "Quản lý chuyến thuê" },
     { to: "/renter/profile", icon: User, label: "Hồ sơ" },
   ];
 
