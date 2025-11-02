@@ -23,8 +23,18 @@ exports.getVehicles = async (req, res) => {
 
     if (station) filter.currentStation = station;
     if (type) filter.type = type;
-    if (status) filter.status = status;
-    else filter.status = "available"; // Default show available only
+    
+    // Status filter
+    if (status) {
+      // Support 'all' to show all vehicles regardless of status (for staff/admin)
+      if (status !== 'all') {
+        filter.status = status;
+      }
+      // If status = 'all', don't add status filter
+    } else {
+      // Default: show available only for public users
+      filter.status = "available";
+    }
 
     if (minPrice || maxPrice) {
       filter.pricePerHour = {};
