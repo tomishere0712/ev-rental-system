@@ -25,12 +25,16 @@ const RenterProfilePage = () => {
     phone: "",
   });
   const [documents, setDocuments] = useState({
-    driverLicense: null,
-    nationalId: null,
+    driverLicenseFront: null,
+    driverLicenseBack: null,
+    nationalIdFront: null,
+    nationalIdBack: null,
   });
   const [previews, setPreviews] = useState({
-    driverLicense: null,
-    nationalId: null,
+    driverLicenseFront: null,
+    driverLicenseBack: null,
+    nationalIdFront: null,
+    nationalIdBack: null,
   });
 
   // Set form data when user is loaded
@@ -47,12 +51,11 @@ const RenterProfilePage = () => {
   // Cleanup preview URLs on unmount
   useEffect(() => {
     return () => {
-      if (previews.driverLicense) {
-        URL.revokeObjectURL(previews.driverLicense);
-      }
-      if (previews.nationalId) {
-        URL.revokeObjectURL(previews.nationalId);
-      }
+      Object.values(previews).forEach(previewUrl => {
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+        }
+      });
     };
   }, [previews]);
 
@@ -102,14 +105,16 @@ const RenterProfilePage = () => {
         [docType]: previewUrl,
       });
 
-      toast.success(
-        `Đã chọn ${
-          docType === "driverLicense" ? "Giấy phép lái xe" : "CMND/CCCD"
-        }`,
-        {
-          duration: 2000,
-        }
-      );
+      const docNames = {
+        driverLicenseFront: "Giấy phép lái xe (Mặt trước)",
+        driverLicenseBack: "Giấy phép lái xe (Mặt sau)",
+        nationalIdFront: "CMND/CCCD (Mặt trước)",
+        nationalIdBack: "CMND/CCCD (Mặt sau)",
+      };
+
+      toast.success(`Đã chọn ${docNames[docType]}`, {
+        duration: 2000,
+      });
     }
   };
 
@@ -144,22 +149,43 @@ const RenterProfilePage = () => {
   };
 
   const handleUploadDocuments = async () => {
-    if (!documents.driverLicense || !documents.nationalId) {
-      if (!documents.driverLicense && !documents.nationalId) {
-        toast.error("Vui lòng chọn cả Giấy phép lái xe và CMND/CCCD");
-      } else if (!documents.driverLicense) {
-        toast.error("Vui lòng chọn Giấy phép lái xe");
-      } else {
-        toast.error("Vui lòng chọn CMND/CCCD");
-      }
+    const { driverLicenseFront, driverLicenseBack, nationalIdFront, nationalIdBack } = documents;
+    
+    // Kiểm tra xem có ít nhất 1 ảnh mới được chọn
+    const hasNewImages = driverLicenseFront || driverLicenseBack || nationalIdFront || nationalIdBack;
+    
+    if (!hasNewImages) {
+      toast.error("Vui lòng chọn ít nhất 1 ảnh để upload");
       return;
+    }
+
+    // Nếu chưa có ảnh cũ (upload lần đầu), bắt buộc phải có đủ 4 ảnh
+    const hasOldDriverLicense = user?.driverLicense?.images?.length >= 2;
+    const hasOldNationalId = user?.nationalId?.images?.length >= 2;
+    
+    if (!hasOldDriverLicense || !hasOldNationalId) {
+      // Upload lần đầu - bắt buộc cả 4 ảnh
+      if (!driverLicenseFront || !driverLicenseBack || !nationalIdFront || !nationalIdBack) {
+        const missing = [];
+        if (!driverLicenseFront) missing.push("Giấy phép lái xe (Mặt trước)");
+        if (!driverLicenseBack) missing.push("Giấy phép lái xe (Mặt sau)");
+        if (!nationalIdFront) missing.push("CMND/CCCD (Mặt trước)");
+        if (!nationalIdBack) missing.push("CMND/CCCD (Mặt sau)");
+        
+        toast.error(`Vui lòng chọn đủ 4 ảnh: ${missing.join(", ")}`);
+        return;
+      }
     }
 
     try {
       setUploading(true);
       const formData = new FormData();
-      formData.append("driverLicense", documents.driverLicense);
-      formData.append("nationalId", documents.nationalId);
+      
+      // Chỉ append những ảnh được chọn mới
+      if (driverLicenseFront) formData.append("driverLicenseFront", driverLicenseFront);
+      if (driverLicenseBack) formData.append("driverLicenseBack", driverLicenseBack);
+      if (nationalIdFront) formData.append("nationalIdFront", nationalIdFront);
+      if (nationalIdBack) formData.append("nationalIdBack", nationalIdBack);
 
       const response = await authService.uploadDocuments(formData);
 
@@ -171,16 +197,25 @@ const RenterProfilePage = () => {
         });
 
         // Cleanup preview URLs
-        if (previews.driverLicense) {
-          URL.revokeObjectURL(previews.driverLicense);
-        }
-        if (previews.nationalId) {
-          URL.revokeObjectURL(previews.nationalId);
-        }
+        Object.values(previews).forEach(previewUrl => {
+          if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+          }
+        });
 
         // Clear documents and previews
-        setDocuments({ driverLicense: null, nationalId: null });
-        setPreviews({ driverLicense: null, nationalId: null });
+        setDocuments({
+          driverLicenseFront: null,
+          driverLicenseBack: null,
+          nationalIdFront: null,
+          nationalIdBack: null,
+        });
+        setPreviews({
+          driverLicenseFront: null,
+          driverLicenseBack: null,
+          nationalIdFront: null,
+          nationalIdBack: null,
+        });
       }
     } catch (error) {
       console.error("Upload error:", error);
@@ -424,169 +459,321 @@ const RenterProfilePage = () => {
               </div>
             )}
 
-            <div className="space-y-4">
-              {/* Driver License */}
+            <div className="space-y-6">
+              {/* Driver License - Front & Back */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Giấy phép lái xe
-                </label>
-                {user?.driverLicense?.images &&
-                user.driverLicense.images.length > 0 ? (
-                  <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                    <img
-                      src={user.driverLicense.images[0]}
-                      alt="Driver License"
-                      className="w-full h-48 object-contain mb-2 rounded"
-                    />
-                    <div className="flex items-center justify-center text-sm text-green-600">
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      Đã upload
-                    </div>
-                  </div>
-                ) : verification.canReupload &&
-                  (documents.driverLicense || previews.driverLicense) ? (
-                  <div className="border border-primary-300 rounded-lg p-4 bg-primary-50">
-                    <div className="relative">
-                      <img
-                        src={previews.driverLicense}
-                        alt="Preview"
-                        className="w-full h-48 object-contain mb-2 rounded"
-                      />
-                      <button
-                        onClick={() => handleRemoveFile("driverLicense")}
-                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <p className="text-sm text-gray-600 text-center mt-2">
-                      <ImageIcon className="w-4 h-4 inline mr-1" />
-                      {documents.driverLicense?.name}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary-400 hover:bg-primary-50 transition-all cursor-pointer">
-                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                    <label className="cursor-pointer">
-                      <span className="text-primary-600 hover:text-primary-700 font-medium text-lg">
-                        Chọn ảnh Giấy phép lái xe
-                      </span>
-                      <p className="text-sm text-gray-500 mt-1">
-                        PNG, JPG, JPEG (Tối đa 5MB)
-                      </p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleFileChange(e, "driverLicense")}
-                        className="hidden"
-                        disabled={!verification.canReupload}
-                      />
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  📄 Giấy phép lái xe
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Front */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Mặt trước
                     </label>
-                    {documents.driverLicense && (
-                      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-start gap-3">
+                    {previews.driverLicenseFront ? (
+                      // Hiển thị preview ảnh mới được chọn
+                      <div className="border border-primary-300 rounded-lg p-4 bg-primary-50">
+                        <div className="relative">
                           <img
-                            src={previews.driverLicense}
-                            alt="Preview Giấy phép lái xe"
-                            className="w-20 h-20 object-cover rounded border border-green-300"
+                            src={previews.driverLicenseFront}
+                            alt="Preview"
+                            className="w-full h-48 object-contain mb-2 rounded"
                           />
-                          <div>
-                            <p className="text-sm text-green-800 font-medium">
-                              ✓ {documents.driverLicense.name}
-                            </p>
-                            <p className="text-xs text-green-600 mt-1">
-                              {(documents.driverLicense.size / 1024).toFixed(2)}{" "}
-                              KB
-                            </p>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile("driverLicenseFront")}
+                            className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="text-sm text-gray-600 text-center mt-2">
+                          <ImageIcon className="w-4 h-4 inline mr-1" />
+                          {documents.driverLicenseFront?.name}
+                        </p>
+                      </div>
+                    ) : user?.driverLicense?.images && user.driverLicense.images[0] ? (
+                      // Hiển thị ảnh cũ
+                      <div className={`border rounded-lg p-4 ${verification.canReupload ? 'border-primary-300 bg-primary-50' : 'border-gray-300 bg-gray-50'}`}>
+                        <img
+                          src={user.driverLicense.images[0]}
+                          alt="Driver License Front"
+                          className="w-full h-48 object-contain mb-2 rounded"
+                        />
+                        <div className={`flex items-center justify-center text-sm ${verification.canReupload ? 'text-primary-600' : 'text-green-600'}`}>
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          {verification.canReupload ? 'Ảnh hiện tại (có thể thay đổi)' : 'Đã upload'}
                         </div>
                       </div>
+                    ) : (
+                      // Chưa có ảnh - hiển thị upload
+                      <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 hover:bg-primary-50 transition-all cursor-pointer block">
+                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <span className="text-primary-600 hover:text-primary-700 font-medium text-sm block">
+                          Chọn ảnh mặt trước
+                        </span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          PNG, JPG (Tối đa 5MB)
+                        </p>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, "driverLicenseFront")}
+                          className="hidden"
+                          disabled={!verification.canReupload}
+                        />
+                      </label>
+                    )}
+                    {/* Button upload lại nếu đã có ảnh cũ và canReupload */}
+                    {user?.driverLicense?.images && user.driverLicense.images[0] && verification.canReupload && !previews.driverLicenseFront && (
+                      <label className="mt-2 block">
+                        <div className="border-2 border-dashed border-primary-300 rounded-lg p-3 text-center hover:border-primary-500 hover:bg-primary-50 transition-all cursor-pointer">
+                          <Upload className="w-5 h-5 text-primary-600 mx-auto mb-1" />
+                          <span className="text-primary-600 hover:text-primary-700 font-medium text-xs block">
+                            Thay đổi ảnh này
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFileChange(e, "driverLicenseFront")}
+                            className="hidden"
+                          />
+                        </div>
+                      </label>
                     )}
                   </div>
-                )}
+
+                  {/* Back */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Mặt sau
+                    </label>
+                    {previews.driverLicenseBack ? (
+                      <div className="border border-primary-300 rounded-lg p-4 bg-primary-50">
+                        <div className="relative">
+                          <img
+                            src={previews.driverLicenseBack}
+                            alt="Preview"
+                            className="w-full h-48 object-contain mb-2 rounded"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile("driverLicenseBack")}
+                            className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="text-sm text-gray-600 text-center mt-2">
+                          <ImageIcon className="w-4 h-4 inline mr-1" />
+                          {documents.driverLicenseBack?.name}
+                        </p>
+                      </div>
+                    ) : user?.driverLicense?.images && user.driverLicense.images[1] ? (
+                      <div className={`border rounded-lg p-4 ${verification.canReupload ? 'border-primary-300 bg-primary-50' : 'border-gray-300 bg-gray-50'}`}>
+                        <img
+                          src={user.driverLicense.images[1]}
+                          alt="Driver License Back"
+                          className="w-full h-48 object-contain mb-2 rounded"
+                        />
+                        <div className={`flex items-center justify-center text-sm ${verification.canReupload ? 'text-primary-600' : 'text-green-600'}`}>
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          {verification.canReupload ? 'Ảnh hiện tại (có thể thay đổi)' : 'Đã upload'}
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 hover:bg-primary-50 transition-all cursor-pointer block">
+                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <span className="text-primary-600 hover:text-primary-700 font-medium text-sm block">
+                          Chọn ảnh mặt sau
+                        </span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          PNG, JPG (Tối đa 5MB)
+                        </p>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, "driverLicenseBack")}
+                          className="hidden"
+                          disabled={!verification.canReupload}
+                        />
+                      </label>
+                    )}
+                    {user?.driverLicense?.images && user.driverLicense.images[1] && verification.canReupload && !previews.driverLicenseBack && (
+                      <label className="mt-2 block">
+                        <div className="border-2 border-dashed border-primary-300 rounded-lg p-3 text-center hover:border-primary-500 hover:bg-primary-50 transition-all cursor-pointer">
+                          <Upload className="w-5 h-5 text-primary-600 mx-auto mb-1" />
+                          <span className="text-primary-600 hover:text-primary-700 font-medium text-xs block">
+                            Thay đổi ảnh này
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFileChange(e, "driverLicenseBack")}
+                            className="hidden"
+                          />
+                        </div>
+                      </label>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* National ID */}
+              {/* National ID - Front & Back */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  CMND/CCCD
-                </label>
-                {user?.nationalId?.images &&
-                user.nationalId.images.length > 0 ? (
-                  <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                    <img
-                      src={user.nationalId.images[0]}
-                      alt="National ID"
-                      className="w-full h-48 object-contain mb-2 rounded"
-                    />
-                    <div className="flex items-center justify-center text-sm text-green-600">
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      Đã upload
-                    </div>
-                  </div>
-                ) : verification.canReupload &&
-                  (documents.nationalId || previews.nationalId) ? (
-                  <div className="border border-primary-300 rounded-lg p-4 bg-primary-50">
-                    <div className="relative">
-                      <img
-                        src={previews.nationalId}
-                        alt="Preview"
-                        className="w-full h-48 object-contain mb-2 rounded"
-                      />
-                      <button
-                        onClick={() => handleRemoveFile("nationalId")}
-                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <p className="text-sm text-gray-600 text-center mt-2">
-                      <ImageIcon className="w-4 h-4 inline mr-1" />
-                      {documents.nationalId?.name}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary-400 hover:bg-primary-50 transition-all cursor-pointer">
-                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                    <label className="cursor-pointer">
-                      <span className="text-primary-600 hover:text-primary-700 font-medium">
-                        {user?.nationalId?.images &&
-                        user.nationalId.images.length > 0
-                          ? "Chọn file mới"
-                          : "Chọn file"}
-                      </span>
-                      <p className="text-sm text-gray-500 mt-1">
-                        PNG, JPG, JPEG (Tối đa 5MB)
-                      </p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleFileChange(e, "nationalId")}
-                        className="hidden"
-                        disabled={!verification.canReupload}
-                      />
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  🪪 CMND/CCCD
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Front */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Mặt trước
                     </label>
-                    {documents.nationalId && (
-                      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-start gap-3">
+                    {previews.nationalIdFront ? (
+                      <div className="border border-primary-300 rounded-lg p-4 bg-primary-50">
+                        <div className="relative">
                           <img
-                            src={previews.nationalId}
-                            alt="Preview CMND/CCCD"
-                            className="w-20 h-20 object-cover rounded border border-green-300"
+                            src={previews.nationalIdFront}
+                            alt="Preview"
+                            className="w-full h-48 object-contain mb-2 rounded"
                           />
-                          <div>
-                            <p className="text-sm text-green-800 font-medium">
-                              ✓ {documents.nationalId.name}
-                            </p>
-                            <p className="text-xs text-green-600 mt-1">
-                              {(documents.nationalId.size / 1024).toFixed(2)} KB
-                            </p>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile("nationalIdFront")}
+                            className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="text-sm text-gray-600 text-center mt-2">
+                          <ImageIcon className="w-4 h-4 inline mr-1" />
+                          {documents.nationalIdFront?.name}
+                        </p>
+                      </div>
+                    ) : user?.nationalId?.images && user.nationalId.images[0] ? (
+                      <div className={`border rounded-lg p-4 ${verification.canReupload ? 'border-primary-300 bg-primary-50' : 'border-gray-300 bg-gray-50'}`}>
+                        <img
+                          src={user.nationalId.images[0]}
+                          alt="National ID Front"
+                          className="w-full h-48 object-contain mb-2 rounded"
+                        />
+                        <div className={`flex items-center justify-center text-sm ${verification.canReupload ? 'text-primary-600' : 'text-green-600'}`}>
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          {verification.canReupload ? 'Ảnh hiện tại (có thể thay đổi)' : 'Đã upload'}
                         </div>
                       </div>
+                    ) : (
+                      <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 hover:bg-primary-50 transition-all cursor-pointer block">
+                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <span className="text-primary-600 hover:text-primary-700 font-medium text-sm block">
+                          Chọn ảnh mặt trước
+                        </span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          PNG, JPG (Tối đa 5MB)
+                        </p>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, "nationalIdFront")}
+                          className="hidden"
+                          disabled={!verification.canReupload}
+                        />
+                      </label>
+                    )}
+                    {user?.nationalId?.images && user.nationalId.images[0] && verification.canReupload && !previews.nationalIdFront && (
+                      <label className="mt-2 block">
+                        <div className="border-2 border-dashed border-primary-300 rounded-lg p-3 text-center hover:border-primary-500 hover:bg-primary-50 transition-all cursor-pointer">
+                          <Upload className="w-5 h-5 text-primary-600 mx-auto mb-1" />
+                          <span className="text-primary-600 hover:text-primary-700 font-medium text-xs block">
+                            Thay đổi ảnh này
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFileChange(e, "nationalIdFront")}
+                            className="hidden"
+                          />
+                        </div>
+                      </label>
                     )}
                   </div>
-                )}
+
+                  {/* Back */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Mặt sau
+                    </label>
+                    {previews.nationalIdBack ? (
+                      <div className="border border-primary-300 rounded-lg p-4 bg-primary-50">
+                        <div className="relative">
+                          <img
+                            src={previews.nationalIdBack}
+                            alt="Preview"
+                            className="w-full h-48 object-contain mb-2 rounded"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile("nationalIdBack")}
+                            className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="text-sm text-gray-600 text-center mt-2">
+                          <ImageIcon className="w-4 h-4 inline mr-1" />
+                          {documents.nationalIdBack?.name}
+                        </p>
+                      </div>
+                    ) : user?.nationalId?.images && user.nationalId.images[1] ? (
+                      <div className={`border rounded-lg p-4 ${verification.canReupload ? 'border-primary-300 bg-primary-50' : 'border-gray-300 bg-gray-50'}`}>
+                        <img
+                          src={user.nationalId.images[1]}
+                          alt="National ID Back"
+                          className="w-full h-48 object-contain mb-2 rounded"
+                        />
+                        <div className={`flex items-center justify-center text-sm ${verification.canReupload ? 'text-primary-600' : 'text-green-600'}`}>
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          {verification.canReupload ? 'Ảnh hiện tại (có thể thay đổi)' : 'Đã upload'}
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 hover:bg-primary-50 transition-all cursor-pointer block">
+                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <span className="text-primary-600 hover:text-primary-700 font-medium text-sm block">
+                          Chọn ảnh mặt sau
+                        </span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          PNG, JPG (Tối đa 5MB)
+                        </p>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, "nationalIdBack")}
+                          className="hidden"
+                          disabled={!verification.canReupload}
+                        />
+                      </label>
+                    )}
+                    {user?.nationalId?.images && user.nationalId.images[1] && verification.canReupload && !previews.nationalIdBack && (
+                      <label className="mt-2 block">
+                        <div className="border-2 border-dashed border-primary-300 rounded-lg p-3 text-center hover:border-primary-500 hover:bg-primary-50 transition-all cursor-pointer">
+                          <Upload className="w-5 h-5 text-primary-600 mx-auto mb-1" />
+                          <span className="text-primary-600 hover:text-primary-700 font-medium text-xs block">
+                            Thay đổi ảnh này
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFileChange(e, "nationalIdBack")}
+                            className="hidden"
+                          />
+                        </div>
+                      </label>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Nút upload chỉ hiển thị khi canReupload = true */}
@@ -594,21 +781,8 @@ const RenterProfilePage = () => {
                 <div className="space-y-2">
                   <button
                     onClick={handleUploadDocuments}
-                    disabled={
-                      uploading ||
-                      !documents.driverLicense ||
-                      !documents.nationalId
-                    }
+                    disabled={uploading}
                     className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    title={
-                      !documents.driverLicense && !documents.nationalId
-                        ? "Vui lòng chọn cả 2 file"
-                        : !documents.driverLicense
-                        ? "Vui lòng chọn Giấy phép lái xe"
-                        : !documents.nationalId
-                        ? "Vui lòng chọn CMND/CCCD"
-                        : "Click để upload"
-                    }
                   >
                     {uploading ? (
                       <>
@@ -624,11 +798,11 @@ const RenterProfilePage = () => {
                       </>
                     )}
                   </button>
-                  {(!documents.driverLicense || !documents.nationalId) && (
-                    <p className="text-sm text-gray-500 text-center">
-                      Vui lòng chọn cả 2 file trước khi upload
-                    </p>
-                  )}
+                  <p className="text-sm text-gray-500 text-center">
+                    {verification.status === "rejected" 
+                      ? "Chọn ít nhất 1 ảnh để upload lại" 
+                      : "Vui lòng chọn đủ 4 ảnh (2 mặt giấy phép lái xe + 2 mặt CMND/CCCD)"}
+                  </p>
                 </div>
               )}
             </div>
