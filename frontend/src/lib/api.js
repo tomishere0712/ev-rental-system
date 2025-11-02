@@ -15,17 +15,8 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = useAuthStore.getState().token;
-    const user = useAuthStore.getState().user;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log(
-        "Request with token - User role:",
-        user?.role,
-        "Endpoint:",
-        config.url
-      );
-    } else {
-      console.log("No token found in authStore - Endpoint:", config.url);
     }
     return config;
   },

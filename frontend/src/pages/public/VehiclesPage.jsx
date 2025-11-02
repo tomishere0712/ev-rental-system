@@ -6,9 +6,10 @@ import { useAuthStore } from "../../store/authStore";
 import toast from "react-hot-toast";
 
 const VehiclesPage = () => {
-  const user = useAuthStore(state => state.user);
-  const isStaffOrAdmin = user && (user.role === "staff" || user.role === "admin");
-  
+  const user = useAuthStore((state) => state.user);
+  const isStaffOrAdmin =
+    user && (user.role === "staff" || user.role === "admin");
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [vehicles, setVehicles] = useState([]);
   const [stations, setStations] = useState([]);
@@ -46,7 +47,7 @@ const VehiclesPage = () => {
   const fetchVehicles = async () => {
     try {
       setLoading(true);
-      
+
       // Build clean params object, removing empty values
       const params = {
         page: pagination.page,
@@ -55,7 +56,7 @@ const VehiclesPage = () => {
 
       // Staff/Admin can see all vehicles including maintenance
       if (isStaffOrAdmin) {
-        params.status = 'all';
+        params.status = "all";
       }
 
       // Only add filter params if they have values
@@ -245,7 +246,9 @@ const VehiclesPage = () => {
                 </label>
                 <select
                   value={filters.station}
-                  onChange={(e) => handleFilterChange("station", e.target.value)}
+                  onChange={(e) =>
+                    handleFilterChange("station", e.target.value)
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="">Tất cả điểm thuê</option>
@@ -356,7 +359,8 @@ const VehiclesPage = () => {
                           <div className="flex items-center text-sm text-gray-600">
                             <Battery className="w-4 h-4 mr-2 text-primary-600" />
                             <span>
-                              Pin: {vehicle.currentBatteryLevel}% • {vehicle.range}
+                              Pin: {vehicle.currentBatteryLevel}% •{" "}
+                              {vehicle.range}
                               km
                             </span>
                           </div>
@@ -376,11 +380,13 @@ const VehiclesPage = () => {
                             <div className="text-xs text-gray-500">/ giờ</div>
                           </div>
                           <Link to={`/vehicles/${vehicle._id}`}>
-                            <button className={`${
-                              isStaffOrAdmin 
-                                ? "bg-gray-600 hover:bg-gray-700"
-                                : "bg-primary-600 hover:bg-primary-700"
-                            } text-white px-4 py-2 rounded-lg font-medium transition-colors`}>
+                            <button
+                              className={`${
+                                isStaffOrAdmin
+                                  ? "bg-gray-600 hover:bg-gray-700"
+                                  : "bg-primary-600 hover:bg-primary-700"
+                              } text-white px-4 py-2 rounded-lg font-medium transition-colors`}
+                            >
                               {isStaffOrAdmin ? "Xem chi tiết" : "Thuê ngay"}
                             </button>
                           </Link>

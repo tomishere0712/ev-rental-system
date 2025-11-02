@@ -802,6 +802,13 @@ exports.createStaff = async (req, res) => {
       isVerified: true,
     });
 
+    // Update Station.staff array (two-way reference)
+    if (assignedStation) {
+      await Station.findByIdAndUpdate(assignedStation, {
+        $addToSet: { staff: staff._id },
+      });
+    }
+
     const staffData = await User.findById(staff._id)
       .select("-password")
       .populate("assignedStation");
@@ -823,6 +830,16 @@ exports.updateStaff = async (req, res) => {
   try {
     const { fullName, phone, assignedStation, isActive } = req.body;
 
+    // Get current staff to check old station
+    const oldStaff = await User.findById(req.params.id);
+    if (!oldStaff) {
+      return res.status(404).json({ message: "Không tìm thấy nhân viên" });
+    }
+
+    const oldStationId = oldStaff.assignedStation?.toString();
+    const newStationId = assignedStation?.toString();
+
+    // Update staff
     const staff = await User.findByIdAndUpdate(
       req.params.id,
       { fullName, phone, assignedStation, isActive },
@@ -831,14 +848,27 @@ exports.updateStaff = async (req, res) => {
       .select("-password")
       .populate("assignedStation");
 
-    if (!staff) {
-      return res.status(404).json({ message: "Không tìm thấy nhân viên" });
+    // Update Station.staff arrays (two-way reference)
+    if (oldStationId !== newStationId) {
+      // Remove from old station
+      if (oldStationId) {
+        await Station.findByIdAndUpdate(oldStationId, {
+          $pull: { staff: req.params.id },
+        });
+      }
+
+      // Add to new station
+      if (newStationId) {
+        await Station.findByIdAndUpdate(newStationId, {
+          $addToSet: { staff: req.params.id },
+        });
+      }
     }
 
     res.json({
       success: true,
       data: staff,
-      message: "Đã cập nhật nhân viên thành công",
+      message: "Đã cập nhật thông tin nhân viên",
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -854,6 +884,13 @@ exports.deleteStaff = async (req, res) => {
 
     if (!staff || staff.role !== "staff") {
       return res.status(404).json({ message: "Không tìm thấy nhân viên" });
+    }
+
+    // Remove from station's staff array (two-way reference)
+    if (staff.assignedStation) {
+      await Station.findByIdAndUpdate(staff.assignedStation, {
+        $pull: { staff: req.params.id },
+      });
     }
 
     await User.findByIdAndDelete(req.params.id);
