@@ -18,6 +18,7 @@ const ManageStaffPage = () => {
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStationFilter, setSelectedStationFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
@@ -44,7 +45,6 @@ const ManageStaffPage = () => {
         adminService.getAllStaff(),
         adminService.getAllStations(),
       ]);
-      console.log();
       const staffArray =
         staffData?.data ||
         staffData?.staff ||
@@ -54,6 +54,16 @@ const ManageStaffPage = () => {
 
       setStaff(Array.isArray(staffArray) ? staffArray : []);
       setStations(Array.isArray(stationsArray) ? stationsArray : []);
+      console.log(
+        "Stations data:",
+        stationsArray.map((station) => ({
+          name: station.name,
+          staff: station.staff,
+        }))
+      );
+      // stationsArray.forEach((station) => {
+      //   console.log(`${station.name} - Staff: ${station.staff?.length || 0}`);
+      // });
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -66,15 +76,23 @@ const ManageStaffPage = () => {
 
     try {
       if (editingStaff) {
-        // For editing, don't send password if empty
-        const updateData = { ...formData };
-        if (!updateData.password) {
-          delete updateData.password;
-        }
+        // For editing, only send fullName and phone
+        const updateData = {
+          fullName: formData.fullName,
+          phone: formData.phone,
+        };
         await adminService.updateStaff(editingStaff._id, updateData);
         toast.success("Staff updated successfully!");
       } else {
-        await adminService.createStaff(formData);
+        // For creating, send all fields
+        const createData = {
+          fullName: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone,
+          assignedStation: formData.assignedStation,
+        };
+        await adminService.createStaff(createData);
         toast.success("Staff created successfully!");
       }
 
@@ -92,7 +110,7 @@ const ManageStaffPage = () => {
       email: staffMember.email,
       password: "",
       phone: staffMember.phone,
-      assignedStation: staffMember.assignedStation?._id || "",
+      assignedStation: "",
     });
     setShowModal(true);
   };
@@ -172,12 +190,20 @@ const ManageStaffPage = () => {
     });
   };
 
-  const filteredStaff = staff.filter(
-    (member) =>
+  const filteredStaff = staff.filter((member) => {
+    // Filter by search query
+    const matchesSearch =
       member.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.phone?.includes(searchQuery)
-  );
+      member.phone?.includes(searchQuery);
+
+    // Filter by selected station
+    const matchesStation =
+      !selectedStationFilter ||
+      member.assignedStation?._id === selectedStationFilter;
+
+    return matchesSearch && matchesStation;
+  });
 
   if (loading) {
     return (
@@ -205,17 +231,33 @@ const ManageStaffPage = () => {
         </button>
       </div>
 
-      {/* Search */}
+      {/* Search & Filter */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, email, or phone..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+        <div className="flex gap-4 flex-col md:flex-row items-end">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, email, or phone..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          <select
+            value={selectedStationFilter}
+            onChange={(e) => setSelectedStationFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[200px]"
+          >
+            <option value="">Tất cả Trạm</option>
+            {stations.map((station) => (
+              <option key={station._id} value={station._id}>
+                {station.name} ({station.code})
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -375,13 +417,6 @@ const ManageStaffPage = () => {
         )}
       </div>
 
-      {filteredStaff.length === 0 && (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
-          <UserCheck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No staff members found</p>
-        </div>
-      )}
-
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -416,34 +451,37 @@ const ManageStaffPage = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email *
+                  Email {editingStaff ? "(Read-only)" : "*"}
                 </label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) =>
+                    !editingStaff &&
                     setFormData({ ...formData, email: e.target.value })
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Password{" "}
-                  {editingStaff ? "(leave blank to keep current)" : "*"}
-                </label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  readOnly={!!editingStaff}
                   required={!editingStaff}
                 />
               </div>
+
+              {!editingStaff && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password *
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -459,29 +497,31 @@ const ManageStaffPage = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Assigned Station *
-                </label>
-                <select
-                  value={formData.assignedStation}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assignedStation: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Select Station</option>
-                  {stations.map((station) => (
-                    <option key={station._id} value={station._id}>
-                      {station.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {!editingStaff && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Assigned Station *
+                  </label>
+                  <select
+                    value={formData.assignedStation}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        assignedStation: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select Station</option>
+                    {stations.map((station) => (
+                      <option key={station._id} value={station._id}>
+                        {station.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <button
