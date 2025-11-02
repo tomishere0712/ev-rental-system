@@ -45,7 +45,7 @@ import PaymentResultPage from "./pages/payment/PaymentResultPage";
 
 function App() {
   const { user } = useAuthStore();
-  
+
   // Auto-refresh user data on app mount/reload
   useAuthRefresh();
 

@@ -140,12 +140,16 @@ export const paymentService = {
   },
 
   createPaymentLink: async (bookingId) => {
-    const response = await api.post("/payments/create-payment-link", { bookingId });
+    const response = await api.post("/payments/create-payment-link", {
+      bookingId,
+    });
     return response.data;
   },
 
   createVNPayUrl: async (bookingId) => {
-    const response = await api.post("/payments/create-vnpay-url", { bookingId });
+    const response = await api.post("/payments/create-vnpay-url", {
+      bookingId,
+    });
     return response.data;
   },
 

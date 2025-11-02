@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
 import { adminService } from "../../services";
-import { Users, Search, AlertTriangle, Ban, Shield, Eye } from "lucide-react";
+import {
+  Users,
+  Search,
+  AlertTriangle,
+  Ban,
+  Shield,
+  Eye,
+  AlertCircle,
+} from "lucide-react";
 import toast from "react-hot-toast";
 
 const ManageUsersPage = () => {
@@ -9,6 +17,8 @@ const ManageUsersPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showViolationsModal, setShowViolationsModal] = useState(false);
+  const [userViolations, setUserViolations] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -74,6 +84,11 @@ const ManageUsersPage = () => {
         error.response?.data?.message || "Failed to update user status"
       );
     }
+  };
+
+  const handleViewViolations = (user) => {
+    setUserViolations(user);
+    setShowViolationsModal(true);
   };
 
   const filteredUsers = users.filter((user) => {
@@ -250,6 +265,18 @@ const ManageUsersPage = () => {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
+                      {user.violationCount > 0 && (
+                        <button
+                          onClick={() => handleViewViolations(user)}
+                          className="p-2 text-orange-600 hover:bg-orange-50 rounded relative"
+                          title="View Violations"
+                        >
+                          <AlertCircle className="w-4 h-4" />
+                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                            {user.violationCount}
+                          </span>
+                        </button>
+                      )}
                       <button
                         onClick={() => handleBlockUser(user._id)}
                         className={`p-2 rounded ${
@@ -421,6 +448,98 @@ const ManageUsersPage = () => {
               <button
                 onClick={() => setShowDetailsModal(false)}
                 className="w-full px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Violations Modal */}
+      {showViolationsModal && userViolations && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-gradient-to-r from-orange-600 to-orange-700 px-6 py-4 flex justify-between items-center rounded-t-lg">
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                <AlertCircle className="w-5 h-5" />
+                Violation History
+              </h3>
+              <button
+                onClick={() => setShowViolationsModal(false)}
+                className="text-white hover:bg-orange-800 rounded-full p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* User Info */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Customer:</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {userViolations.fullName}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {userViolations.email}
+                </p>
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  <div>
+                    <p className="text-xs text-gray-600">Risk Level</p>
+                    <p className="text-sm font-semibold text-gray-900 uppercase">
+                      {userViolations.riskLevel}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600">Total Violations</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {userViolations.violationCount}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Violations List */}
+              {userViolations.violations &&
+              userViolations.violations.length > 0 ? (
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-gray-900">Violations:</h4>
+                  {userViolations.violations.map((violation, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-red-50 p-4 rounded-lg border-l-4 border-red-500"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-semibold text-red-900">
+                            {violation.type?.replace("_", " ").toUpperCase()}
+                          </p>
+                          <p className="text-sm text-red-700">
+                            {violation.severity?.toUpperCase() || "MEDIUM"}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-700 mt-2">
+                        {violation.description}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Date:{" "}
+                        {new Date(violation.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-green-50 p-4 rounded-lg text-center">
+                  <p className="text-green-700 font-medium">
+                    No violations recorded
+                  </p>
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowViolationsModal(false)}
+                className="w-full px-4 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
               >
                 Close
               </button>

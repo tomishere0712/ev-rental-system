@@ -476,7 +476,10 @@ exports.transferVehicle = async (req, res) => {
 // @access  Private/Admin
 exports.getAllStations = async (req, res) => {
   try {
-    const stations = await Station.find().sort({ createdAt: -1 });
+    const stations = await Station.find()
+      .populate("staff", "fullName email phone")
+      .populate("manager", "fullName email phone")
+      .sort({ createdAt: -1 });
 
     // Get vehicle count for each station
     const stationsWithCount = await Promise.all(
@@ -484,8 +487,11 @@ exports.getAllStations = async (req, res) => {
         const vehicleCount = await Vehicle.countDocuments({
           currentStation: station._id,
         });
+
+        // Convert to object while preserving populated fields
+        const stationObj = station.toObject();
         return {
-          ...station.toObject(),
+          ...stationObj,
           vehicleCount,
         };
       })
@@ -917,46 +923,6 @@ exports.getStaffPerformance = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy nhân viên" });
     }
 
-    // @desc    Assign station to staff
-    // @route   PUT /api/admin/staff/:id/assign-station
-    // @access  Private/Admin
-    exports.assignStaffToStation = async (req, res) => {
-      try {
-        const { stationId } = req.body;
-
-        if (!stationId) {
-          return res.status(400).json({ message: "Vui lòng chọn trạm" });
-        }
-
-        // Verify station exists
-        const station = await Station.findById(stationId);
-        if (!station) {
-          return res.status(404).json({ message: "Không tìm thấy trạm" });
-        }
-
-        // Update staff's assigned station
-        const staff = await User.findByIdAndUpdate(
-          req.params.id,
-          { assignedStation: stationId },
-          { new: true }
-        )
-          .select("-password")
-          .populate("assignedStation");
-
-        if (!staff || staff.role !== "staff") {
-          return res.status(404).json({ message: "Không tìm thấy nhân viên" });
-        }
-
-        res.json({
-          success: true,
-          data: staff,
-          message: `Đã phân công nhân viên ${staff.fullName} đến trạm ${station.name}`,
-        });
-      } catch (error) {
-        res.status(500).json({ message: error.message });
-      }
-    };
-
     // Number of bookings the staff verified (used earlier in other stats)
     const bookingsVerified = await Booking.countDocuments({
       verifiedBy: staff._id,
@@ -1045,6 +1011,15 @@ exports.assignStaffToStation = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy trạm" });
     }
 
+    // Get current staff to check old station
+    const oldStaff = await User.findById(req.params.id);
+    if (!oldStaff || oldStaff.role !== "staff") {
+      return res.status(404).json({ message: "Không tìm thấy nhân viên" });
+    }
+
+    const oldStationId = oldStaff.assignedStation?.toString();
+    const newStationId = stationId?.toString();
+
     // Update staff's assigned station
     const staff = await User.findByIdAndUpdate(
       req.params.id,
@@ -1054,8 +1029,21 @@ exports.assignStaffToStation = async (req, res) => {
       .select("-password")
       .populate("assignedStation");
 
-    if (!staff || staff.role !== "staff") {
-      return res.status(404).json({ message: "Không tìm thấy nhân viên" });
+    // Update Station.staff arrays (two-way reference)
+    if (oldStationId !== newStationId) {
+      // Remove from old station
+      if (oldStationId) {
+        await Station.findByIdAndUpdate(oldStationId, {
+          $pull: { staff: req.params.id },
+        });
+      }
+
+      // Add to new station
+      if (newStationId) {
+        await Station.findByIdAndUpdate(newStationId, {
+          $addToSet: { staff: req.params.id },
+        });
+      }
     }
 
     res.json({
