@@ -53,6 +53,11 @@ const VehiclesPage = () => {
         limit: pagination.limit,
       };
 
+      // Staff/Admin can see all vehicles including maintenance
+      if (isStaffOrAdmin) {
+        params.status = 'all';
+      }
+
       // Only add filter params if they have values
       if (filters.search) params.search = filters.search;
       if (filters.type) params.type = filters.type;
