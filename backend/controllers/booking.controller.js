@@ -22,9 +22,31 @@ exports.createBooking = async (req, res) => {
       return res.status(400).json({ message: "Xe không khả dụng" });
     }
 
-    // Calculate pricing
+    // Check for overlapping bookings (pending, confirmed, or in-progress)
     const start = new Date(startDate);
     const end = new Date(endDate);
+    
+    const overlappingBooking = await Booking.findOne({
+      vehicle,
+      status: { $in: ["pending", "confirmed", "in-progress"] },
+      $or: [
+        // New booking starts during existing booking
+        { startDate: { $lte: start }, endDate: { $gt: start } },
+        // New booking ends during existing booking
+        { startDate: { $lt: end }, endDate: { $gte: end } },
+        // New booking contains existing booking
+        { startDate: { $gte: start }, endDate: { $lte: end } },
+      ],
+    });
+
+    if (overlappingBooking) {
+      return res.status(400).json({ 
+        message: "Xe đã có người đặt trong khoảng thời gian này",
+        conflictBooking: overlappingBooking.bookingNumber 
+      });
+    }
+
+    // Calculate pricing
     const hours = Math.ceil((end - start) / (1000 * 60 * 60));
     const days = Math.ceil(hours / 24);
 
@@ -35,8 +57,14 @@ exports.createBooking = async (req, res) => {
       basePrice = vehicleDoc.pricePerDay * days;
     }
 
+    // Generate booking number manually (validation runs before pre-save hooks)
+    const count = await Booking.countDocuments();
+    const bookingNumber = `BK${Date.now()}${String(count + 1).padStart(4, "0")}`;
+    console.log("Generated bookingNumber:", bookingNumber);
+
     // Create booking
-    const booking = await Booking.create({
+    const booking = new Booking({
+      bookingNumber,
       renter: req.user.id,
       vehicle,
       station: pickupStation,
@@ -51,10 +79,13 @@ exports.createBooking = async (req, res) => {
       },
       status: "pending",
     });
+    await booking.save();
+    console.log("✅ Booking saved successfully:", bookingNumber);
 
-    // Update vehicle status
-    vehicleDoc.status = "rented";
+    // Update vehicle status to reserved when booking is created
+    vehicleDoc.status = "reserved";
     await vehicleDoc.save();
+    console.log("✅ Vehicle status updated to: reserved");
 
     // Populate booking details
     const populatedBooking = await Booking.findById(booking._id)
@@ -69,6 +100,10 @@ exports.createBooking = async (req, res) => {
       data: populatedBooking,
     });
   } catch (error) {
+    console.error("❌ Error creating booking:");
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+    console.error("Full error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -218,6 +253,9 @@ exports.signContract = async (req, res) => {
 
     booking.status = "confirmed";
     await booking.save();
+
+    // Update vehicle status to reserved when booking is confirmed
+    await Vehicle.findByIdAndUpdate(booking.vehicle, { status: "reserved" });
 
     res.json({
       success: true,

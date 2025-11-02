@@ -34,25 +34,34 @@ const RenterDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      // Fetch active bookings
+      
+      // Fetch active bookings (confirmed and in-progress)
       const bookingsResponse = await bookingService.getMyBookings({
-        status: "confirmed,picked-up",
+        status: "confirmed,in-progress",
+        limit: 10,
       });
-      const bookings = bookingsResponse.data.bookings || [];
+      console.log("Dashboard bookings response:", bookingsResponse);
+      
+      // Backend returns: { success, data: [...], pagination: {...} }
+      const bookings = bookingsResponse.data || [];
       setActiveBookings(bookings);
 
-      // Calculate stats
+      // Fetch all bookings for stats
       const allBookingsResponse = await bookingService.getMyBookings({
         limit: 1000,
       });
-      const allBookings = allBookingsResponse.data.bookings || [];
+      const allBookings = allBookingsResponse.data || [];
 
+      // Calculate total spent
       const totalSpent = allBookings.reduce(
-        (sum, b) => sum + (b.totalPrice || 0),
+        (sum, b) => sum + (b.pricing?.totalAmount || 0),
         0
       );
-      const uniqueVehicles = new Set(allBookings.map((b) => b.vehicle?._id))
-        .size;
+      
+      // Count unique vehicles
+      const uniqueVehicles = new Set(
+        allBookings.filter(b => b.vehicle?._id).map((b) => b.vehicle._id)
+      ).size;
 
       setStats({
         activeBookings: bookings.length,
@@ -80,14 +89,14 @@ const RenterDashboard = () => {
         text: "Đã xác nhận",
         icon: CheckCircle,
       },
-      "picked-up": {
+      "in-progress": {
         color: "bg-green-100 text-green-800",
         text: "Đang thuê",
         icon: Car,
       },
-      returned: {
+      completed: {
         color: "bg-gray-100 text-gray-800",
-        text: "Đã trả",
+        text: "Hoàn thành",
         icon: CheckCircle,
       },
       cancelled: {
@@ -253,7 +262,7 @@ const RenterDashboard = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-lg font-bold text-primary-600">
-                            {booking.totalPrice?.toLocaleString("vi-VN")}đ
+                            {booking.pricing?.totalAmount?.toLocaleString("vi-VN")}đ
                           </div>
                         </div>
                       </div>
@@ -262,7 +271,7 @@ const RenterDashboard = () => {
                         <div className="flex items-center text-gray-600">
                           <Clock className="w-4 h-4 mr-2" />
                           <span>
-                            {new Date(booking.pickupTime).toLocaleDateString(
+                            {new Date(booking.startDate).toLocaleDateString(
                               "vi-VN"
                             )}
                           </span>

@@ -268,7 +268,7 @@ exports.handoverVehicle = async (req, res) => {
     await booking.save();
 
     // Update vehicle status
-    await Vehicle.findByIdAndUpdate(booking.vehicleId, {
+    await Vehicle.findByIdAndUpdate(booking.vehicle, {
       status: "rented",
       currentBatteryLevel: batteryLevelBefore,
       odometer: odometerBefore,
@@ -314,7 +314,7 @@ exports.returnVehicle = async (req, res) => {
 
     if (now > expectedReturn) {
       const lateHours = Math.ceil((now - expectedReturn) / (1000 * 60 * 60));
-      const vehicle = await Vehicle.findById(booking.vehicleId);
+      const vehicle = await Vehicle.findById(booking.vehicle);
       lateFees = lateHours * vehicle.pricePerHour * 1.5; // 1.5x for late fees
     }
 
@@ -331,7 +331,7 @@ exports.returnVehicle = async (req, res) => {
     await booking.save();
 
     // Update vehicle status
-    await Vehicle.findByIdAndUpdate(booking.vehicleId, {
+    await Vehicle.findByIdAndUpdate(booking.vehicle, {
       status: "available",
       currentBatteryLevel: batteryLevelAfter,
       odometer: odometerAfter,

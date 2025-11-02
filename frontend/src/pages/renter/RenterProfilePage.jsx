@@ -33,6 +33,7 @@ const RenterProfilePage = () => {
     nationalId: null,
   });
 
+  // Set form data when user is loaded
   useEffect(() => {
     if (user) {
       setFormData({
@@ -127,17 +128,6 @@ const RenterProfilePage = () => {
       [docType]: null,
     });
   };
-
-  // const handleRemoveFile = (docType) => {
-  //   setDocuments({
-  //     ...documents,
-  //     [docType]: null,
-  //   });
-  //   setPreviews({
-  //     ...previews,
-  //     [docType]: null,
-  //   });
-  // };
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();

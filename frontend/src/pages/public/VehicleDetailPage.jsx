@@ -46,7 +46,7 @@ const VehicleDetailPage = () => {
       navigate("/login", { state: { from: `/vehicles/${id}` } });
       return;
     }
-    navigate(`/book/${id}`);
+    navigate(`/renter/book?vehicleId=${id}`);
   };
 
   const getStatusBadge = (status) => {
