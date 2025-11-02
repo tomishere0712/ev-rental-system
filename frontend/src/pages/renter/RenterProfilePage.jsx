@@ -13,6 +13,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import ChangePasswordCard from "../../components/ChangePasswordCard";
 
 const RenterProfilePage = () => {
   const { user, updateUser } = useAuthStore();
@@ -34,12 +35,6 @@ const RenterProfilePage = () => {
 
   useEffect(() => {
     if (user) {
-      console.log("=== RenterProfilePage User Data ===");
-      console.log("Full user object:", user);
-      console.log("verificationStatus:", user.verificationStatus);
-      console.log("driverLicense:", user.driverLicense);
-      console.log("nationalId:", user.nationalId);
-      
       setFormData({
         fullName: user.fullName || "",
         email: user.email || "",
@@ -59,10 +54,6 @@ const RenterProfilePage = () => {
       }
     };
   }, [previews]);
-
-  useEffect(() => {
-    console.log("Documents state changed:", documents);
-  }, [documents]);
 
   const handleInputChange = (e) => {
     setFormData({
@@ -99,20 +90,25 @@ const RenterProfilePage = () => {
 
       // Create preview URL
       const previewUrl = URL.createObjectURL(file);
-      
+
       // Cleanup old preview URL if exists
       if (previews[docType]) {
         URL.revokeObjectURL(previews[docType]);
       }
-      
+
       setPreviews({
         ...previews,
         [docType]: previewUrl,
       });
 
-      toast.success(`Đã chọn ${docType === "driverLicense" ? "Giấy phép lái xe" : "CMND/CCCD"}`, {
-        duration: 2000,
-      });
+      toast.success(
+        `Đã chọn ${
+          docType === "driverLicense" ? "Giấy phép lái xe" : "CMND/CCCD"
+        }`,
+        {
+          duration: 2000,
+        }
+      );
     }
   };
 
@@ -121,7 +117,7 @@ const RenterProfilePage = () => {
     if (previews[docType]) {
       URL.revokeObjectURL(previews[docType]);
     }
-    
+
     setDocuments({
       ...documents,
       [docType]: null,
@@ -158,8 +154,6 @@ const RenterProfilePage = () => {
   };
 
   const handleUploadDocuments = async () => {
-    console.log("Documents state:", documents);
-    
     if (!documents.driverLicense || !documents.nationalId) {
       if (!documents.driverLicense && !documents.nationalId) {
         toast.error("Vui lòng chọn cả Giấy phép lái xe và CMND/CCCD");
@@ -177,20 +171,15 @@ const RenterProfilePage = () => {
       formData.append("driverLicense", documents.driverLicense);
       formData.append("nationalId", documents.nationalId);
 
-      console.log("Uploading files:", {
-        driverLicense: documents.driverLicense.name,
-        nationalId: documents.nationalId.name
-      });
-
       const response = await authService.uploadDocuments(formData);
-      
+
       if (response.success) {
         updateUser(response.data.user);
         toast.success("Upload giấy tờ thành công! Đang chờ xét duyệt.", {
           duration: 5000,
           icon: "✅",
         });
-        
+
         // Cleanup preview URLs
         if (previews.driverLicense) {
           URL.revokeObjectURL(previews.driverLicense);
@@ -198,17 +187,20 @@ const RenterProfilePage = () => {
         if (previews.nationalId) {
           URL.revokeObjectURL(previews.nationalId);
         }
-        
+
         // Clear documents and previews
         setDocuments({ driverLicense: null, nationalId: null });
         setPreviews({ driverLicense: null, nationalId: null });
       }
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error(error.response?.data?.message || "Upload thất bại. Vui lòng thử lại!", {
-        duration: 5000,
-        icon: "❌",
-      });
+      toast.error(
+        error.response?.data?.message || "Upload thất bại. Vui lòng thử lại!",
+        {
+          duration: 5000,
+          icon: "❌",
+        }
+      );
     } finally {
       setUploading(false);
     }
@@ -217,11 +209,13 @@ const RenterProfilePage = () => {
   const getVerificationStatus = () => {
     // Kiểm tra verificationStatus từ backend
     const verificationStatus = user?.verificationStatus || "none";
-    
+
     // Kiểm tra xem có ảnh uploaded hay không
-    const hasDriverLicense = user?.driverLicense?.images && user.driverLicense.images.length > 0;
-    const hasNationalId = user?.nationalId?.images && user.nationalId.images.length > 0;
-    
+    const hasDriverLicense =
+      user?.driverLicense?.images && user.driverLicense.images.length > 0;
+    const hasNationalId =
+      user?.nationalId?.images && user.nationalId.images.length > 0;
+
     if (verificationStatus === "rejected") {
       return {
         status: "rejected",
@@ -232,7 +226,7 @@ const RenterProfilePage = () => {
         canReupload: true,
       };
     }
-    
+
     if (verificationStatus === "pending") {
       return {
         status: "pending",
@@ -243,7 +237,7 @@ const RenterProfilePage = () => {
         canReupload: false,
       };
     }
-    
+
     if (verificationStatus === "approved" || user?.isVerified) {
       return {
         status: "verified",
@@ -254,7 +248,7 @@ const RenterProfilePage = () => {
         canReupload: false,
       };
     }
-    
+
     // none hoặc chưa có giấy tờ
     if (!hasDriverLicense || !hasNationalId) {
       return {
@@ -266,7 +260,7 @@ const RenterProfilePage = () => {
         canReupload: true,
       };
     }
-    
+
     return {
       status: "none",
       icon: <AlertCircle className="w-5 h-5" />,
@@ -368,6 +362,9 @@ const RenterProfilePage = () => {
             </form>
           </div>
 
+          {/* Change Password Card */}
+          <ChangePasswordCard />
+
           {/* Document Upload Card */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
@@ -443,7 +440,8 @@ const RenterProfilePage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Giấy phép lái xe
                 </label>
-                {user?.driverLicense?.images && user.driverLicense.images.length > 0 ? (
+                {user?.driverLicense?.images &&
+                user.driverLicense.images.length > 0 ? (
                   <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
                     <img
                       src={user.driverLicense.images[0]}
@@ -455,7 +453,8 @@ const RenterProfilePage = () => {
                       Đã upload
                     </div>
                   </div>
-                ) : verification.canReupload && (documents.driverLicense || previews.driverLicense) ? (
+                ) : verification.canReupload &&
+                  (documents.driverLicense || previews.driverLicense) ? (
                   <div className="border border-primary-300 rounded-lg p-4 bg-primary-50">
                     <div className="relative">
                       <img
@@ -496,9 +495,9 @@ const RenterProfilePage = () => {
                     {documents.driverLicense && (
                       <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                         <div className="flex items-start gap-3">
-                          <img 
-                            src={previews.driverLicense} 
-                            alt="Preview Giấy phép lái xe" 
+                          <img
+                            src={previews.driverLicense}
+                            alt="Preview Giấy phép lái xe"
                             className="w-20 h-20 object-cover rounded border border-green-300"
                           />
                           <div>
@@ -506,7 +505,8 @@ const RenterProfilePage = () => {
                               ✓ {documents.driverLicense.name}
                             </p>
                             <p className="text-xs text-green-600 mt-1">
-                              {(documents.driverLicense.size / 1024).toFixed(2)} KB
+                              {(documents.driverLicense.size / 1024).toFixed(2)}{" "}
+                              KB
                             </p>
                           </div>
                         </div>
@@ -521,7 +521,8 @@ const RenterProfilePage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   CMND/CCCD
                 </label>
-                {user?.nationalId?.images && user.nationalId.images.length > 0 ? (
+                {user?.nationalId?.images &&
+                user.nationalId.images.length > 0 ? (
                   <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
                     <img
                       src={user.nationalId.images[0]}
@@ -533,7 +534,8 @@ const RenterProfilePage = () => {
                       Đã upload
                     </div>
                   </div>
-                ) : verification.canReupload && (documents.nationalId || previews.nationalId) ? (
+                ) : verification.canReupload &&
+                  (documents.nationalId || previews.nationalId) ? (
                   <div className="border border-primary-300 rounded-lg p-4 bg-primary-50">
                     <div className="relative">
                       <img
@@ -558,7 +560,10 @@ const RenterProfilePage = () => {
                     <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
                     <label className="cursor-pointer">
                       <span className="text-primary-600 hover:text-primary-700 font-medium">
-                        {user?.nationalId?.images && user.nationalId.images.length > 0 ? "Chọn file mới" : "Chọn file"}
+                        {user?.nationalId?.images &&
+                        user.nationalId.images.length > 0
+                          ? "Chọn file mới"
+                          : "Chọn file"}
                       </span>
                       <p className="text-sm text-gray-500 mt-1">
                         PNG, JPG, JPEG (Tối đa 5MB)
@@ -574,9 +579,9 @@ const RenterProfilePage = () => {
                     {documents.nationalId && (
                       <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                         <div className="flex items-start gap-3">
-                          <img 
-                            src={previews.nationalId} 
-                            alt="Preview CMND/CCCD" 
+                          <img
+                            src={previews.nationalId}
+                            alt="Preview CMND/CCCD"
                             className="w-20 h-20 object-cover rounded border border-green-300"
                           />
                           <div>
@@ -598,10 +603,7 @@ const RenterProfilePage = () => {
               {verification.canReupload && (
                 <div className="space-y-2">
                   <button
-                    onClick={() => {
-                      console.log("Button clicked, current documents:", documents);
-                      handleUploadDocuments();
-                    }}
+                    onClick={handleUploadDocuments}
                     disabled={
                       uploading ||
                       !documents.driverLicense ||
@@ -626,7 +628,9 @@ const RenterProfilePage = () => {
                     ) : (
                       <>
                         <Upload className="w-5 h-5" />
-                        {verification.status === "rejected" ? "Upload lại giấy tờ" : "Upload giấy tờ"}
+                        {verification.status === "rejected"
+                          ? "Upload lại giấy tờ"
+                          : "Upload giấy tờ"}
                       </>
                     )}
                   </button>

@@ -8,6 +8,7 @@ const {
   getMe,
   uploadDocuments,
   updateProfile,
+  changePassword,
 } = require("../controllers/auth.controller");
 
 // @route   POST /api/auth/register
@@ -43,5 +44,10 @@ router.post(
 // @desc    Update user profile
 // @access  Private
 router.put("/profile", protect, updateProfile);
+
+// @route   PUT /api/auth/change-password
+// @desc    Change user password
+// @access  Private
+router.put("/change-password", protect, changePassword);
 
 module.exports = router;

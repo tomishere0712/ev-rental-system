@@ -27,6 +27,7 @@ import VehicleHandoverPage from "./pages/staff/VehicleHandoverPage";
 import CustomerVerificationPage from "./pages/staff/CustomerVerificationPage";
 import StationVehiclesPage from "./pages/staff/StationVehiclesPage";
 import ProcessPaymentPage from "./pages/staff/ProcessPaymentPage";
+import StaffProfilePage from "./pages/staff/StaffProfilePage";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -35,12 +36,13 @@ import ManageStationsPage from "./pages/admin/ManageStationsPage";
 import ManageUsersPage from "./pages/admin/ManageUsersPage";
 import ManageStaffPage from "./pages/admin/ManageStaffPage";
 import ReportsPage from "./pages/admin/ReportsPage";
+import AdminProfilePage from "./pages/admin/AdminProfilePage";
 
 function App() {
   const { user } = useAuthStore();
 
   // Protected Route Component
-  // eslint-disable-next-line react/prop-types
+  /* eslint-disable react/prop-types */
   const ProtectedRoute = ({ children, allowedRoles }) => {
     if (!user) {
       return <Navigate to="/login" replace />;
@@ -52,6 +54,7 @@ function App() {
 
     return children;
   };
+  /* eslint-enable react/prop-types */
 
   return (
     <Routes>
@@ -96,6 +99,7 @@ function App() {
         <Route path="/staff/verify" element={<CustomerVerificationPage />} />
         <Route path="/staff/vehicles" element={<StationVehiclesPage />} />
         <Route path="/staff/payment" element={<ProcessPaymentPage />} />
+        <Route path="/staff/profile" element={<StaffProfilePage />} />
       </Route>
 
       {/* Admin Routes */}
@@ -112,6 +116,7 @@ function App() {
         <Route path="/admin/users" element={<ManageUsersPage />} />
         <Route path="/admin/staff" element={<ManageStaffPage />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
+        <Route path="/admin/profile" element={<AdminProfilePage />} />
       </Route>
 
       {/* 404 */}
