@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { staffService } from "../../services"
-import { CheckCircle, XCircle, User, CreditCard, BadgeCheck, Loader2, Search, Eye, Edit2 } from "lucide-react"
+import { CheckCircle, XCircle, User, CreditCard, BadgeCheck, Loader2, Search, Edit2 } from "lucide-react"
 
 const CustomerVerificationPage = () => {
   const [pending, setPending] = useState([])
@@ -73,7 +73,7 @@ const CustomerVerificationPage = () => {
     try {
       await staffService.verifyUserDocuments(selectedUser._id, {
         approved: approvedStatus,
-        verificationNote,
+        note: verificationNote,
       })
 
       // Update UI locally
@@ -293,7 +293,7 @@ const CustomerVerificationPage = () => {
                           }}
                           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition font-medium text-sm"
                         >
-                          <Eye className="w-4 h-4" />
+                          <CheckCircle className="w-4 h-4" />
                           {statusType === "pending" ? "Xác minh" : "Xem"}
                         </button>
                       </td>
@@ -485,27 +485,47 @@ const CustomerVerificationPage = () => {
                 >
                   Hủy
                 </button>
-                <button
-                  onClick={() => handleReconsider(false)}
-                  disabled={verifying}
-                  className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 font-medium transition"
-                >
-                  {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
-                  Từ chối lại
-                </button>
-                <button
-                  onClick={() => handleReconsider(true)}
-                  disabled={verifying}
-                  className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 font-medium transition"
-                >
-                  {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
-                  Phê duyệt lại
-                </button>
+                {/* Chỉ hiện nút "Từ chối lại" nếu hồ sơ đang được phê duyệt */}
+                {approved.some((u) => u._id === selectedUser._id) && (
+                  <button
+                    onClick={() => handleReconsider(false)}
+                    disabled={verifying}
+                    className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 font-medium transition"
+                  >
+                    {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
+                    Từ chối hồ sơ
+                  </button>
+                )}
+                {/* Chỉ hiện nút "Phê duyệt lại" nếu hồ sơ đang bị từ chối */}
+                {rejected.some((u) => u._id === selectedUser._id) && (
+                  <button
+                    onClick={() => handleReconsider(true)}
+                    disabled={verifying}
+                    className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 font-medium transition"
+                  >
+                    {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                    Phê duyệt lại
+                  </button>
+                )}
               </div>
             )}
 
             {!reconsiderationMode && !pending.some((u) => u._id === selectedUser._id) && (
-              <div className="border-t border-gray-200 p-6 bg-gray-50">
+              <div className="border-t border-gray-200 p-6 bg-gray-50 space-y-3">
+                {(approved.some((u) => u._id === selectedUser._id) || rejected.some((u) => u._id === selectedUser._id)) && (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setReconsiderationMode(true)
+                        setReconsiderationNote(selectedUser.verificationNote || "")
+                      }}
+                      className="flex-1 bg-yellow-600 text-white py-3 rounded-lg hover:bg-yellow-700 font-medium transition flex justify-center items-center gap-2"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                      Xem xét lại hồ sơ
+                    </button>
+                  </div>
+                )}
                 <button
                   onClick={() => {
                     setSelectedUser(null)

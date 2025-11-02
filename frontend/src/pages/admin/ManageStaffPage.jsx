@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { adminService } from "../../services";
+import AssignStationModal from "../../components/admin/AssignStationModal";
 import {
   UserCheck,
   Plus,
@@ -17,7 +18,9 @@ const ManageStaffPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
+  const [selectedStaff, setSelectedStaff] = useState(null);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -112,6 +115,16 @@ const ManageStaffPage = () => {
       phone: "",
       assignedStation: "",
     });
+  };
+
+  const handleAssignStation = (staffMember) => {
+    setSelectedStaff(staffMember);
+    setShowAssignModal(true);
+  };
+
+  const handleAssignSuccess = () => {
+    fetchData(); // Refresh staff list after successful assignment
+    setShowAssignModal(false);
   };
 
   const filteredStaff = staff.filter(
@@ -279,6 +292,13 @@ const ManageStaffPage = () => {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
+                        onClick={() => handleAssignStation(member)}
+                        className="p-2 text-green-600 hover:bg-green-50 rounded"
+                        title="Assign Station"
+                      >
+                        <MapPin className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => handleDelete(member._id)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded"
                         title="Delete"
@@ -428,6 +448,14 @@ const ManageStaffPage = () => {
           </div>
         </div>
       )}
+
+      {/* Modal phân công trạm */}
+      <AssignStationModal
+        staff={selectedStaff}
+        isOpen={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        onAssign={handleAssignSuccess}
+      />
     </div>
   );
 };

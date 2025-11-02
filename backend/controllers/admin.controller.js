@@ -728,6 +728,46 @@ exports.getStaffPerformance = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy nhân viên" });
     }
 
+    // @desc    Assign station to staff
+    // @route   PUT /api/admin/staff/:id/assign-station
+    // @access  Private/Admin
+    exports.assignStaffToStation = async (req, res) => {
+      try {
+        const { stationId } = req.body;
+    
+        if (!stationId) {
+          return res.status(400).json({ message: "Vui lòng chọn trạm" });
+        }
+    
+        // Verify station exists
+        const station = await Station.findById(stationId);
+        if (!station) {
+          return res.status(404).json({ message: "Không tìm thấy trạm" });
+        }
+    
+        // Update staff's assigned station
+        const staff = await User.findByIdAndUpdate(
+          req.params.id,
+          { assignedStation: stationId },
+          { new: true }
+        )
+          .select("-password")
+          .populate("assignedStation");
+    
+        if (!staff || staff.role !== "staff") {
+          return res.status(404).json({ message: "Không tìm thấy nhân viên" });
+        }
+    
+        res.json({
+          success: true,
+          data: staff,
+          message: `Đã phân công nhân viên ${staff.fullName} đến trạm ${station.name}`,
+        });
+      } catch (error) {
+        res.status(500).json({ message: error.message });
+      }
+    };
+
     // Number of bookings the staff verified (used earlier in other stats)
     const bookingsVerified = await Booking.countDocuments({
       verifiedBy: staff._id,
@@ -793,6 +833,46 @@ exports.getStaffPerformance = async (req, res) => {
           satisfactionScore, // percent or null
         },
       },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Assign station to staff
+// @route   PUT /api/admin/staff/:id/assign-station
+// @access  Private/Admin
+exports.assignStaffToStation = async (req, res) => {
+  try {
+    const { stationId } = req.body;
+
+    if (!stationId) {
+      return res.status(400).json({ message: "Vui lòng chọn trạm" });
+    }
+
+    // Verify station exists
+    const station = await Station.findById(stationId);
+    if (!station) {
+      return res.status(404).json({ message: "Không tìm thấy trạm" });
+    }
+
+    // Update staff's assigned station
+    const staff = await User.findByIdAndUpdate(
+      req.params.id,
+      { assignedStation: stationId },
+      { new: true }
+    )
+      .select("-password")
+      .populate("assignedStation");
+
+    if (!staff || staff.role !== "staff") {
+      return res.status(404).json({ message: "Không tìm thấy nhân viên" });
+    }
+
+    res.json({
+      success: true,
+      data: staff,
+      message: `Đã phân công nhân viên ${staff.fullName} đến trạm ${station.name}`,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -189,6 +189,48 @@ exports.getRejectedVerifications = async (req, res) => {
   }
 };
 
+// @desc    Xem xét lại hồ sơ đã được phê duyệt hoặc từ chối
+// @route   PATCH /api/staff/verifications/:userId/reconsider
+// @access  Private/Staff
+exports.reconsiderVerification = async (req, res) => {
+  try {
+    const { approved, verificationNote } = req.body;
+    const user = await User.findById(req.params.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+
+    if (user.role !== "renter") {
+      return res.status(400).json({ message: "Chỉ có thể xem xét lại hồ sơ người thuê" });
+    }
+
+    // Bắt buộc nhập note khi từ chối
+    if (!approved && (!verificationNote || verificationNote.trim() === "")) {
+      return res.status(400).json({
+        message: "Vui lòng nhập lý do từ chối hồ sơ.",
+      });
+    }
+
+    user.driverLicense.verified = approved;
+    user.nationalId.verified = approved;
+    user.verificationStatus = approved ? "approved" : "rejected";
+    user.verificationNote = verificationNote;
+    user.isVerified = approved;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: approved ? "✅ Đã phê duyệt lại hồ sơ người thuê" : "❌ Đã từ chối lại hồ sơ người thuê",
+      data: user,
+    });
+  } catch (error) {
+    console.error("reconsiderVerification error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 
 
 // @desc    Handover vehicle to customer

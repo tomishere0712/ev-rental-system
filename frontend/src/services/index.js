@@ -157,6 +157,11 @@ export const staffService = {
     return response.data;
   },
 
+  getProfile: async () => {
+    const response = await api.get("/auth/me");
+    return response.data;
+  },
+
   getBookings: async (params) => {
     const response = await api.get("/staff/bookings", { params });
     return response.data;
@@ -182,8 +187,11 @@ export const staffService = {
     return response.data;
   },
 
-  getVehicles: async (params) => {
-    const response = await api.get("/staff/vehicles", { params });
+  getVehicles: async (params = {}) => {
+    const queryString = Object.keys(params).length > 0 
+      ? `?${new URLSearchParams(params).toString()}`
+      : '';
+    const response = await api.get(`/staff/vehicles${queryString}`);
     return response.data;
   },
 
@@ -233,6 +241,12 @@ export const staffService = {
     const response = await api.get("/staff/verifications/rejected");
     return response.data;
   },
+
+  reconsiderVerification: async (userId, data) => {
+    const response = await api.patch(`/staff/verifications/${userId}/reconsider`, data);
+    return response.data;
+  },
+
 };
 
 // Admin Services
@@ -341,6 +355,11 @@ export const adminService = {
 
   updateStaff: async (id, data) => {
     const response = await api.put(`/admin/staff/${id}`, data);
+    return response.data;
+  },
+
+  assignStaffToStation: async (staffId, stationId) => {
+    const response = await api.put(`/admin/staff/${staffId}/assign-station`, { stationId });
     return response.data;
   },
 
