@@ -80,7 +80,7 @@ const bookingSchema = new mongoose.Schema(
       deposit: Number,
       additionalCharges: [
         {
-          type: String,
+          type: { type: String }, // Need to wrap 'type' field
           amount: Number,
           description: String,
         },
@@ -116,10 +116,62 @@ const bookingSchema = new mongoose.Schema(
       terms: String,
     },
 
+    // Return Request (Optional - User initiated)
+    returnRequest: {
+      requested: { type: Boolean, default: false },
+      requestedAt: Date,
+      expectedReturnTime: Date,
+      notes: String,
+    },
+
+    // Deposit Refund (Manual Bank Transfer)
+    depositRefund: {
+      amount: Number,
+      method: { type: String, enum: ["manual", "none"], default: "manual" }, // manual bank transfer or none if not applicable
+      status: {
+        type: String,
+        enum: ["pending", "refunded", "confirmed", "not_applicable", "pending_payment"],
+        default: "pending",
+      },
+      // Staff marks as refunded after bank transfer
+      refundedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      refundedAt: Date,
+      transferReference: String, // Bank transfer reference
+      transferNotes: String,
+      notes: String, // General notes for refund status
+      // User confirms receipt
+      confirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      confirmedAt: Date,
+    },
+
+    // Additional Payment (When late fees exceed deposit)
+    additionalPayment: {
+      amount: Number,
+      orderId: String, // VNPay order ID for payment tracking
+      transactionId: String, // VNPay transaction ID after payment
+      paidAt: Date,
+      method: String,
+      status: {
+        type: String,
+        enum: ["pending", "completed", "failed"],
+      },
+      notes: String,
+    },
+
     // Status
     status: {
       type: String,
-      enum: ["reserved", "pending", "confirmed", "in-progress", "completed", "cancelled"],
+      enum: [
+        "reserved",
+        "pending",
+        "confirmed",
+        "in-progress",
+        "pending_return", // User requested return
+        "returning", // Staff inspecting
+        "refund_pending", // Waiting for user to confirm refund received
+        "completed",
+        "cancelled",
+      ],
       default: "reserved",
     },
 

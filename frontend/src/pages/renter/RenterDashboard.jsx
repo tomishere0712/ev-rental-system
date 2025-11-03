@@ -35,15 +35,25 @@ const RenterDashboard = () => {
     try {
       setLoading(true);
       
+      console.log("🔄 Fetching dashboard data...");
+      
       // Fetch active bookings (confirmed and in-progress)
       const bookingsResponse = await bookingService.getMyBookings({
         status: "confirmed,in-progress",
         limit: 10,
       });
-      console.log("Dashboard bookings response:", bookingsResponse);
+      
       
       // Backend returns: { success, data: [...], pagination: {...} }
       const bookings = bookingsResponse.data || [];
+      console.log("📋 Active bookings count:", bookings.length);
+      console.log("📋 Active bookings:", bookings);
+      if (bookings.length > 0) {
+        ;
+        bookings.forEach((b, idx) => {
+          
+        });
+      }
       setActiveBookings(bookings);
 
       // Fetch all bookings for stats
@@ -51,12 +61,15 @@ const RenterDashboard = () => {
         limit: 1000,
       });
       const allBookings = allBookingsResponse.data || [];
+      
 
       // Calculate total spent - only count bookings that have been paid (pending, confirmed, in-progress, completed)
       const paidStatuses = ['pending', 'confirmed', 'in-progress', 'completed'];
       const paidBookings = allBookings.filter(b => paidStatuses.includes(b.status));
+     
       
       const totalSpent = paidBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
+    
       
       // Count unique vehicles - only count paid bookings
       const uniqueVehicles = new Set(
@@ -64,16 +77,20 @@ const RenterDashboard = () => {
           .filter(b => b.vehicle?._id)
           .map((b) => b.vehicle._id)
       ).size;
+      
 
-      setStats({
+      const statsData = {
         activeBookings: bookings.length,
         totalBookings: paidBookings.length, // Only count paid bookings
         totalSpent: totalSpent,
         vehiclesRented: uniqueVehicles,
-      });
+      };
+
+      
+      setStats(statsData);
     } catch (error) {
+     
       toast.error("Không thể tải dữ liệu dashboard");
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -94,6 +111,16 @@ const RenterDashboard = () => {
       "in-progress": {
         color: "bg-green-100 text-green-800",
         text: "Đang thuê",
+        icon: Car,
+      },
+      pending_return: {
+        color: "bg-purple-100 text-purple-800",
+        text: "Chờ trả xe",
+        icon: Clock,
+      },
+      returning: {
+        color: "bg-indigo-100 text-indigo-800",
+        text: "Đang trả xe",
         icon: Car,
       },
       completed: {
@@ -145,7 +172,7 @@ const RenterDashboard = () => {
           <div className="text-3xl font-bold text-gray-900 mb-1">
             {loading ? "..." : stats.activeBookings}
           </div>
-          <p className="text-sm text-gray-600">Chuyến đang hoạt động</p>
+          <p className="text-sm text-gray-600">Xe đang thuê</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
@@ -195,7 +222,7 @@ const RenterDashboard = () => {
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  Chuyến đang hoạt động
+                  Xe đang thuê
                 </h2>
                 <Link
                   to="/renter/bookings"

@@ -130,6 +130,28 @@ export const bookingService = {
     const response = await api.get("/bookings/history/analytics");
     return response.data;
   },
+
+  requestReturn: async (id, data) => {
+    const response = await api.post(`/bookings/${id}/request-return`, data);
+    return response.data;
+  },
+
+  confirmRefundReceived: async (id) => {
+    const response = await api.post(`/bookings/${id}/confirm-refund-received`);
+    return response.data;
+  },
+
+  confirmAdditionalPayment: async (id) => {
+    const response = await api.post(`/bookings/${id}/confirm-additional-payment`);
+    return response.data;
+  },
+
+  createAdditionalPaymentUrl: async (id) => {
+    const response = await api.post("/payments/create-vnpay-additional-url", {
+      bookingId: id,
+    });
+    return response.data;
+  },
 };
 
 // Payment Services
@@ -265,6 +287,12 @@ export const staffService = {
       `/staff/verifications/${userId}/reconsider`,
       data
     );
+    return response.data;
+  },
+  
+  // Confirm additional payment received
+  confirmAdditionalPaymentReceived: async (bookingId) => {
+    const response = await api.post(`/staff/bookings/${bookingId}/confirm-additional-payment`);
     return response.data;
   },
 };

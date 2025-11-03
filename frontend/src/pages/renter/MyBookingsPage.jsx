@@ -71,6 +71,7 @@ const MyBookingsPage = () => {
       const params = {
         page: pagination.page,
         limit: pagination.limit,
+        status: 'reserved,pending,confirmed,in-progress,pending_return', // Chỉ lấy các đơn đang active
         ...filters,
       };
 
@@ -80,7 +81,6 @@ const MyBookingsPage = () => {
       // Backend returns: { success, data: [...], pagination: {...} }
       const bookingsData = response.data || [];
       
-      // Hiện tất cả trạng thái (bao gồm cả cancelled, reserved)
       const filteredBookings = Array.isArray(bookingsData) 
         ? bookingsData
         : [];
@@ -103,9 +103,27 @@ const MyBookingsPage = () => {
   const fetchRentalHistory = async () => {
     try {
       setLoading(true);
-      const response = await bookingService.getRentalHistory({ timeRange: "all" });
-      setHistory(response.data.history || []);
-      setAnalytics(response.data.analytics || null);
+      
+      // Lấy các booking đã hoàn thành và đang chờ hoàn tiền
+      const response = await bookingService.getMyBookings({ 
+        status: 'refund_pending,completed,cancelled',
+        limit: 100 
+      });
+      
+      const historyData = response.data || [];
+      setHistory(historyData);
+      
+      // Tính analytics từ dữ liệu history
+      const completedBookings = historyData.filter(b => b.status === 'completed');
+      const totalSpent = completedBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
+      const totalTrips = completedBookings.length;
+      
+      setAnalytics({
+        totalTrips,
+        totalSpent,
+        totalDuration: 0, // Có thể tính sau
+      });
+      
     } catch (error) {
       toast.error("Không thể tải lịch sử thuê xe");
       console.error(error);
@@ -140,6 +158,21 @@ const MyBookingsPage = () => {
         color: "bg-green-100 text-green-800 border-green-200",
         text: "Đang thuê",
         icon: Car,
+      },
+      pending_return: {
+        color: "bg-purple-100 text-purple-800 border-purple-200",
+        text: "Chờ trả xe",
+        icon: Clock,
+      },
+      returning: {
+        color: "bg-indigo-100 text-indigo-800 border-indigo-200",
+        text: "Đang trả xe",
+        icon: Car,
+      },
+      refund_pending: {
+        color: "bg-purple-100 text-purple-800 border-purple-200",
+        text: "Chờ hoàn tiền",
+        icon: DollarSign,
       },
       completed: {
         color: "bg-gray-100 text-gray-800 border-gray-200",

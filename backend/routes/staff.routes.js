@@ -8,15 +8,28 @@ const staffController = require("../controllers/staff.controller");
 router.use(protect);
 router.use(isStaff);
 
+// Staff info
+router.get("/me", staffController.getStaffInfo); // DEBUG endpoint
+router.put("/assign-me", staffController.selfAssignStation); // TEMPORARY FIX
+
 // Dashboard stats
 router.get("/stats", staffController.getStaffStats);
 
 // Bookings
+router.get("/bookings/all", staffController.getAllBookingsDebug); // DEBUG endpoint
 router.get("/bookings", staffController.getStationBookings);
 router.get("/bookings/:id", staffController.getBookingById);
 router.put("/bookings/:id/verify", staffController.verifyCustomer);
 router.put("/bookings/:id/handover", staffController.handoverVehicle);
 router.put("/bookings/:id/return", staffController.returnVehicle);
+router.post(
+  "/bookings/:id/confirm-refund",
+  staffController.confirmManualRefund
+);
+router.post(
+  "/bookings/:id/confirm-additional-payment",
+  staffController.confirmAdditionalPaymentReceived
+);
 router.get("/bookings/:id/payment", staffController.getPaymentSummary);
 
 // Vehicles
@@ -41,6 +54,9 @@ router.get("/verifications/rejected", staffController.getRejectedVerifications);
 router.patch("/verifications/:userId", staffController.verifyUserDocuments);
 
 // ✅ Xem xét lại hồ sơ đã được phê duyệt hoặc từ chối
-router.patch("/verifications/:userId/reconsider", staffController.reconsiderVerification);
+router.patch(
+  "/verifications/:userId/reconsider",
+  staffController.reconsiderVerification
+);
 
 module.exports = router;

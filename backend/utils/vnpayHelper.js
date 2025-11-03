@@ -64,6 +64,7 @@ class VNPayHelper {
       locale = "vn",
       ipAddr,
       orderId,
+      returnUrl = null, // Allow custom return URL
     } = params;
 
     const date = new Date();
@@ -81,7 +82,7 @@ class VNPayHelper {
       vnp_OrderInfo: orderInfo,
       vnp_OrderType: orderType,
       vnp_Amount: Math.round(amount) * 100, // VNPay requires amount * 100
-      vnp_ReturnUrl: this.vnpayConfig.vnp_ReturnUrl,
+      vnp_ReturnUrl: returnUrl || this.vnpayConfig.vnp_ReturnUrl, // Use custom returnUrl if provided
       vnp_IpAddr: normalizeIp(ipAddr),
       vnp_CreateDate: createDate,
       vnp_ExpireDate: expireDate,

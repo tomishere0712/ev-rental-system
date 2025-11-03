@@ -458,6 +458,228 @@ exports.vnpayReturn = async (req, res) => {
   }
 };
 
+// @desc    Create VNPay URL for additional payment (chi phí phát sinh)
+// @route   POST /api/payments/vnpay-additional
+// @access  Private (Renter)
+exports.createVNPayAdditionalUrl = async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "bookingId là bắt buộc",
+      });
+    }
+
+    // Find booking
+    const booking = await Booking.findById(bookingId).populate(
+      "vehicle",
+      "name model"
+    );
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn thuê",
+      });
+    }
+
+    // Check if user is the owner of the booking
+    if (booking.renter.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Bạn không có quyền thanh toán đơn thuê này",
+      });
+    }
+
+    // Check if additional payment is required
+    if (!booking.additionalPayment || booking.additionalPayment.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Không có chi phí phát sinh cần thanh toán",
+      });
+    }
+
+    // Get client IP
+    let ipAddr =
+      req.headers["x-forwarded-for"] ||
+      req.connection.remoteAddress ||
+      req.socket?.remoteAddress ||
+      (req.connection.socket ? req.connection.socket.remoteAddress : null);
+
+    if (ipAddr === '::1' || ipAddr === '::ffff:127.0.0.1') {
+      ipAddr = '127.0.0.1';
+    }
+
+    // Prepare payment data
+    const orderId = `ADDITIONAL_${Date.now()}`;
+    const amount = booking.additionalPayment.amount;
+    const orderInfo = `Chi phi phat sinh don thue ${booking.vehicle?.name} - ${bookingId.slice(-8)}`;
+    
+    // Use separate return URL for additional payment
+    const returnUrl = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/payments/vnpay-additional-return`;
+
+    // Create VNPay payment URL
+    const paymentUrl = vnpayHelper.createPaymentUrl({
+      amount: amount,
+      orderId: orderId,
+      orderInfo: orderInfo,
+      ipAddr: ipAddr,
+      locale: "vn",
+      returnUrl: returnUrl, // Pass custom return URL
+    });
+
+    console.log("=== VNPay Additional Payment URL Created ===");
+    console.log("Order ID:", orderId);
+    console.log("Amount:", amount);
+    console.log("Booking ID:", bookingId);
+    console.log("Return URL:", returnUrl);
+
+    // Save orderId to additionalPayment for callback verification
+    console.log("💾 Saving orderId to booking...");
+    console.log("Before save - additionalPayment:", JSON.stringify(booking.additionalPayment, null, 2));
+    
+    try {
+      // Set orderId
+      booking.additionalPayment.orderId = orderId;
+      
+      // Mark subdocument as modified (important for nested objects in Mongoose)
+      booking.markModified('additionalPayment');
+      
+      const savedBooking = await booking.save();
+      console.log("✅ OrderId saved successfully");
+      console.log("After save - additionalPayment.orderId:", savedBooking.additionalPayment.orderId);
+      
+      // Verify by re-querying from database
+      const verifyBooking = await Booking.findById(bookingId).select('additionalPayment');
+      console.log("🔍 Verification - orderId in DB:", verifyBooking.additionalPayment.orderId);
+    } catch (saveError) {
+      console.error("❌ Error saving orderId to booking:", saveError);
+      throw saveError;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        paymentUrl: paymentUrl,
+        orderCode: orderId,
+        amount: amount,
+        bookingId: bookingId,
+      },
+      message: "Tạo link thanh toán chi phí phát sinh thành công",
+    });
+  } catch (error) {
+    console.error("Create VNPay Additional URL error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Lỗi khi tạo link thanh toán",
+    });
+  }
+};
+
+// @desc    Handle VNPay return callback for additional payment
+// @route   GET /api/payments/vnpay-additional-return
+// @access  Public
+exports.vnpayAdditionalReturn = async (req, res) => {
+  try {
+    let vnpParams = { ...req.query };
+    console.log("=== VNPay Additional Payment Return ===");
+    console.log("Received params:", vnpParams);
+
+    // Verify signature
+    const isValid = vnpayHelper.verifyReturnUrl({ ...vnpParams });
+
+    if (!isValid) {
+      console.error("❌ Signature verification FAILED");
+      return res.status(400).json({
+        success: false,
+        message: "Chữ ký không hợp lệ",
+      });
+    }
+
+    console.log("✅ Signature verified successfully");
+
+    const orderId = vnpParams.vnp_TxnRef;
+    const responseCode = vnpParams.vnp_ResponseCode;
+    const transactionNo = vnpParams.vnp_TransactionNo;
+    const amount = vnpParams.vnp_Amount / 100;
+
+    console.log("Order ID:", orderId);
+    console.log("Response Code:", responseCode);
+    console.log("Transaction No:", transactionNo);
+    console.log("Amount:", amount);
+
+    // Find booking by additionalPayment.orderId
+    console.log("🔍 Searching for booking with additionalPayment.orderId:", orderId);
+    const booking = await Booking.findOne({ "additionalPayment.orderId": orderId });
+
+    if (!booking) {
+      console.error("❌ Booking not found with orderId:", orderId);
+      
+      // Debug: Try to find any booking with pending additional payment
+      const anyPendingBooking = await Booking.findOne({ 
+        "additionalPayment.status": "pending" 
+      }).select("_id bookingCode additionalPayment");
+      
+      console.log("📋 Found pending additional payment booking:", anyPendingBooking);
+      
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn thuê",
+      });
+    }
+
+    console.log("Found booking:", booking._id);
+
+    // Update booking based on response code
+    if (responseCode === "00") {
+      // Payment success
+      console.log("✅ Additional Payment SUCCESS - Updating booking...");
+      
+      booking.additionalPayment.status = "paid";
+      booking.additionalPayment.transactionId = transactionNo;
+      booking.additionalPayment.paidAt = new Date();
+      booking.additionalPayment.method = "vnpay";
+
+      // Update depositRefund status
+      booking.depositRefund.status = "not_applicable";
+      booking.depositRefund.amount = 0;
+      booking.depositRefund.notes = `Chi phí phát sinh đã thanh toán thành công qua VNPAY. Mã GD: ${transactionNo}`;
+
+      // Move booking to refund_pending (waiting for staff to confirm receipt)
+      booking.status = "refund_pending";
+      
+      await booking.save();
+
+      console.log("✅ Booking updated successfully - Status: refund_pending, additionalPayment.status: paid");
+
+      // Redirect to success page
+      const redirectUrl = `${process.env.CLIENT_URL}/payment/additional-success?bookingId=${booking._id}&orderId=${orderId}`;
+      return res.redirect(redirectUrl);
+    } else {
+      // Payment failed or cancelled
+      console.log("❌ Additional Payment FAILED/CANCELLED - Response code:", responseCode);
+      
+      booking.additionalPayment.status = "failed";
+      booking.additionalPayment.transactionId = transactionNo;
+      booking.additionalPayment.notes = `Thanh toán thất bại. Mã lỗi: ${responseCode}`;
+      
+      await booking.save();
+
+      console.log("✅ Booking updated with payment failure");
+
+      // Redirect to failed page
+      const redirectUrl = `${process.env.CLIENT_URL}/payment/additional-failed?bookingId=${booking._id}&orderId=${orderId}&code=${responseCode}`;
+      return res.redirect(redirectUrl);
+    }
+  } catch (error) {
+    console.error("❌ VNPay additional return error:", error);
+    const redirectUrl = `${process.env.CLIENT_URL}/payment/failed?error=${encodeURIComponent(error.message)}`;
+    return res.redirect(redirectUrl);
+  }
+};
+
 // @desc    Query VNPay transaction
 // @route   POST /api/payments/vnpay-query
 // @access  Private (Admin/Staff)

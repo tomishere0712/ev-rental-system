@@ -25,7 +25,7 @@ exports.createBooking = async (req, res) => {
     // Check for overlapping bookings (reserved, pending, confirmed, or in-progress)
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     const overlappingBooking = await Booking.findOne({
       vehicle,
       status: { $in: ["reserved", "pending", "confirmed", "in-progress"] },
@@ -40,9 +40,9 @@ exports.createBooking = async (req, res) => {
     });
 
     if (overlappingBooking) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: "Xe đã có người đặt trong khoảng thời gian này",
-        conflictBooking: overlappingBooking.bookingNumber 
+        conflictBooking: overlappingBooking.bookingNumber,
       });
     }
 
@@ -59,7 +59,10 @@ exports.createBooking = async (req, res) => {
 
     // Generate booking number manually (validation runs before pre-save hooks)
     const count = await Booking.countDocuments();
-    const bookingNumber = `BK${Date.now()}${String(count + 1).padStart(4, "0")}`;
+    const bookingNumber = `BK${Date.now()}${String(count + 1).padStart(
+      4,
+      "0"
+    )}`;
     console.log("Generated bookingNumber:", bookingNumber);
 
     // Calculate reservation timeout (5 minutes from now)
@@ -84,12 +87,19 @@ exports.createBooking = async (req, res) => {
       reservedUntil,
     });
     await booking.save();
-    console.log("✅ Booking saved successfully:", bookingNumber, "- Reserved until:", reservedUntil);
+    console.log(
+      "✅ Booking saved successfully:",
+      bookingNumber,
+      "- Reserved until:",
+      reservedUntil
+    );
 
     // Update vehicle status to "reserved" ngay khi giữ chỗ
     // Nếu hết 5 phút không thanh toán, scheduler sẽ hủy booking và cần trả xe về "available"
     await Vehicle.findByIdAndUpdate(vehicle, { status: "reserved" });
-    console.log("✅ Vehicle status updated to: reserved (holding for 5 minutes)");
+    console.log(
+      "✅ Vehicle status updated to: reserved (holding for 5 minutes)"
+    );
 
     // Populate booking details
     const populatedBooking = await Booking.findById(booking._id)
@@ -119,12 +129,24 @@ exports.getMyBookings = async (req, res) => {
   try {
     const { status, page = 1, limit = 10 } = req.query;
 
-    const filter = { 
+    console.log("📋 getMyBookings - User:", req.user.id);
+    console.log("📋 Query params:", { status, page, limit });
+
+    const filter = {
       renter: req.user.id,
       // Hiện tất cả trạng thái - không filter cancelled nữa
     };
-    
-    if (status) filter.status = status;
+
+    // Handle status filter - support comma-separated values
+    if (status) {
+      if (status.includes(',')) {
+        filter.status = { $in: status.split(',').map(s => s.trim()) };
+        console.log("📋 Status filter (multiple):", filter.status);
+      } else {
+        filter.status = status;
+        console.log("📋 Status filter (single):", filter.status);
+      }
+    }
 
     const skip = (page - 1) * limit;
 
@@ -135,6 +157,11 @@ exports.getMyBookings = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(Number(limit))
       .skip(skip);
+
+    console.log("📋 Found bookings:", bookings.length);
+    if (bookings.length > 0) {
+      console.log("📋 Booking statuses:", bookings.map(b => ({ number: b.bookingNumber, status: b.status })));
+    }
 
     const total = await Booking.countDocuments(filter);
 
@@ -149,6 +176,7 @@ exports.getMyBookings = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("❌ getMyBookings error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -336,6 +364,191 @@ exports.getRentalHistory = async (req, res) => {
       },
     });
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    User confirms they received the manual refund
+// @route   POST /api/bookings/:id/confirm-refund-received
+// @access  Private/Renter
+exports.confirmRefundReceived = async (req, res) => {
+  try {
+    console.log("💰 Confirm refund received:", req.params.id);
+    console.log("👤 User ID:", req.user._id);
+    console.log("👤 User object:", JSON.stringify(req.user, null, 2));
+
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({ message: "Không tìm thấy booking" });
+    }
+
+    console.log("📋 Booking status:", booking.status);
+    console.log("💵 Deposit refund:", booking.depositRefund);
+    console.log("👤 Booking renter:", booking.renter);
+
+    // Verify user is the renter
+    const userId = req.user._id || req.user.id;
+    if (booking.renter.toString() !== userId.toString()) {
+      console.log("❌ User mismatch:", booking.renter.toString(), "vs", userId.toString());
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền xác nhận booking này" });
+    }
+
+    // Only allow confirmation if status is refund_pending
+    if (booking.status !== "refund_pending") {
+      return res.status(400).json({
+        message:
+          "Booking chưa sẵn sàng xác nhận hoàn tiền. Trạng thái hiện tại: " +
+          booking.status,
+      });
+    }
+
+    // Initialize depositRefund if not exists
+    if (!booking.depositRefund) {
+      booking.depositRefund = {
+        amount: booking.pricing?.deposit || 0,
+        method: "bank_transfer",
+        status: "refunded",
+      };
+    }
+
+    // Update deposit refund confirmation
+    booking.depositRefund.status = "confirmed";
+    booking.depositRefund.confirmedBy = req.user._id;
+    booking.depositRefund.confirmedAt = new Date();
+
+    // Mark booking as completed
+    booking.status = "completed";
+
+    await booking.save();
+
+    console.log("✅ Refund confirmed, booking completed");
+
+    res.json({
+      success: true,
+      data: booking,
+      message: `Đã xác nhận nhận tiền hoàn cọc ${(booking.depositRefund.amount || 0).toLocaleString()}đ. Cảm ơn bạn đã sử dụng dịch vụ!`,
+    });
+  } catch (error) {
+    console.error("❌ Confirm refund error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Confirm additional payment received (for cases where late fees exceed deposit)
+// @route   POST /api/bookings/:id/confirm-additional-payment
+// @access  Private/Renter
+exports.confirmAdditionalPayment = async (req, res) => {
+  try {
+    console.log("💳 Confirm additional payment:", req.params.id);
+    console.log("👤 User:", req.user._id);
+
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({ message: "Không tìm thấy booking" });
+    }
+
+    console.log("📋 Booking status:", booking.status);
+    console.log("💳 Additional payment:", booking.additionalPayment);
+
+    // Verify user is the renter
+    const userId = req.user._id || req.user.id;
+    if (booking.renter.toString() !== userId.toString()) {
+      console.log("❌ User mismatch:", booking.renter.toString(), "vs", userId.toString());
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền xác nhận booking này" });
+    }
+
+    // Check if additional payment exists and is pending
+    if (!booking.additionalPayment) {
+      return res.status(400).json({
+        message: "Booking này không có thanh toán bổ sung",
+      });
+    }
+
+    if (booking.additionalPayment.status !== "pending") {
+      return res.status(400).json({
+        message: "Thanh toán bổ sung đã được xác nhận trước đó",
+      });
+    }
+
+    // Update additional payment status
+    booking.additionalPayment.status = "confirmed";
+    booking.additionalPayment.confirmedBy = req.user._id;
+    booking.additionalPayment.confirmedAt = new Date();
+
+    // Mark booking as completed (since additional payment covers all charges)
+    booking.status = "completed";
+
+    await booking.save();
+
+    console.log("✅ Additional payment confirmed, booking completed");
+
+    res.json({
+      success: true,
+      data: booking,
+      message: `Đã xác nhận thanh toán bổ sung ${(booking.additionalPayment.amount || 0).toLocaleString()}đ. Cảm ơn bạn đã sử dụng dịch vụ!`,
+    });
+  } catch (error) {
+    console.error("❌ Confirm additional payment error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Request vehicle return
+// @route   POST /api/bookings/:id/request-return
+// @access  Private/Renter
+exports.requestReturn = async (req, res) => {
+  try {
+    const { returnNotes, returnLocation } = req.body;
+    
+    console.log("🔙 Return request:", req.params.id);
+    console.log("👤 User:", req.user.id);
+
+    const booking = await Booking.findById(req.params.id)
+      .populate("vehicle", "name model licensePlate")
+      .populate("returnStation", "name address");
+
+    if (!booking) {
+      return res.status(404).json({ message: "Không tìm thấy đơn thuê" });
+    }
+
+    // Check ownership
+    if (booking.renter.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Không có quyền thực hiện thao tác này" });
+    }
+
+    // Check status
+    if (booking.status !== "in-progress") {
+      return res.status(400).json({
+        message: `Không thể yêu cầu trả xe. Trạng thái hiện tại: ${booking.status}`,
+      });
+    }
+
+    // Update return request
+    booking.returnRequest = {
+      requestedAt: new Date(),
+      notes: returnNotes || "",
+      location: returnLocation || booking.returnStation?.name || "Tại điểm trả xe đã đăng ký",
+    };
+
+    booking.status = "pending_return";
+
+    await booking.save();
+
+    console.log("✅ Return request created for:", booking.bookingNumber);
+
+    res.json({
+      success: true,
+      data: booking,
+      message: "Đã gửi yêu cầu trả xe. Staff sẽ liên hệ với bạn sớm nhất!",
+    });
+  } catch (error) {
+    console.error("❌ Request return error:", error);
     res.status(500).json({ message: error.message });
   }
 };

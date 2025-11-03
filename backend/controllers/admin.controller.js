@@ -123,8 +123,8 @@ exports.getVehicleUsageByHour = async (req, res) => {
       const hour = new Date(booking.createdAt).getHours();
       hourMap[hour].count += 1;
 
-      if (booking.vehicleId) {
-        hourMap[hour].vehicles.add(booking.vehicleId.toString());
+      if (booking.vehicle) {
+        hourMap[hour].vehicles.add(booking.vehicle.toString());
       }
 
       // Calculate booking duration if available
@@ -307,16 +307,16 @@ exports.getRecentBookings = async (req, res) => {
     const limit = req.query.limit || 10;
 
     const bookings = await Booking.find()
-      .populate("userId", "fullName email")
-      .populate("vehicleId", "brand model name")
+      .populate("renter", "fullName email")
+      .populate("vehicle", "brand model name")
       .sort({ createdAt: -1 })
       .limit(Number(limit));
 
     const data = bookings.map((booking) => ({
       _id: booking._id,
       bookingNumber: booking.bookingNumber,
-      user: booking.userId,
-      vehicle: booking.vehicleId,
+      user: booking.renter,
+      vehicle: booking.vehicle,
       totalAmount: booking.totalAmount,
       status: booking.status,
     }));
@@ -414,7 +414,7 @@ exports.deleteVehicle = async (req, res) => {
   try {
     // Check if vehicle has active bookings
     const activeBooking = await Booking.findOne({
-      vehicleId: req.params.id,
+      vehicle: req.params.id,
       status: { $in: ["pending", "confirmed", "picked-up"] },
     });
 
@@ -603,7 +603,7 @@ exports.getAllUsers = async (req, res) => {
     // Get booking count for each user
     const usersWithStats = await Promise.all(
       users.map(async (user) => {
-        const bookingCount = await Booking.countDocuments({ userId: user._id });
+        const bookingCount = await Booking.countDocuments({ renter: user._id });
         const totalSpent = await Payment.aggregate([
           {
             $match: {
@@ -652,8 +652,8 @@ exports.getUserById = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }
 
-    const bookings = await Booking.find({ userId: user._id })
-      .populate("vehicleId", "name model images")
+    const bookings = await Booking.find({ renter: user._id })
+      .populate("vehicle", "name model images")
       .populate("pickupStation", "name")
       .sort({ createdAt: -1 })
       .limit(10);
