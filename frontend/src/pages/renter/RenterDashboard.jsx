@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import { bookingService } from "../../services";
+import VerificationAlert from "../../components/VerificationAlert";
 import {
   Car,
   Calendar,
@@ -33,35 +34,63 @@ const RenterDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      // Fetch active bookings
+      
+      console.log("🔄 Fetching dashboard data...");
+      
+      // Fetch active bookings (confirmed and in-progress)
       const bookingsResponse = await bookingService.getMyBookings({
-        status: "confirmed,picked-up",
+        status: "confirmed,in-progress",
+        limit: 10,
       });
-      const bookings = bookingsResponse.data.bookings || [];
+      
+      
+      // Backend returns: { success, data: [...], pagination: {...} }
+      const bookings = bookingsResponse.data || [];
+      console.log("📋 Active bookings count:", bookings.length);
+      console.log("📋 Active bookings:", bookings);
+      if (bookings.length > 0) {
+        ;
+        bookings.forEach((b, idx) => {
+          
+        });
+      }
       setActiveBookings(bookings);
 
-      // Calculate stats
+      // Fetch all bookings for stats
       const allBookingsResponse = await bookingService.getMyBookings({
         limit: 1000,
       });
-      const allBookings = allBookingsResponse.data.bookings || [];
+      const allBookings = allBookingsResponse.data || [];
+      
 
-      const totalSpent = allBookings.reduce(
-        (sum, b) => sum + (b.totalPrice || 0),
-        0
-      );
-      const uniqueVehicles = new Set(allBookings.map((b) => b.vehicle?._id))
-        .size;
+      // Calculate total spent - only count bookings that have been paid (pending, confirmed, in-progress, completed)
+      const paidStatuses = ['pending', 'confirmed', 'in-progress', 'completed'];
+      const paidBookings = allBookings.filter(b => paidStatuses.includes(b.status));
+     
+      
+      const totalSpent = paidBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
+    
+      
+      // Count unique vehicles - only count paid bookings
+      const uniqueVehicles = new Set(
+        paidBookings
+          .filter(b => b.vehicle?._id)
+          .map((b) => b.vehicle._id)
+      ).size;
+      
 
-      setStats({
+      const statsData = {
         activeBookings: bookings.length,
-        totalBookings: allBookings.length,
+        totalBookings: paidBookings.length, // Only count paid bookings
         totalSpent: totalSpent,
         vehiclesRented: uniqueVehicles,
-      });
+      };
+
+      
+      setStats(statsData);
     } catch (error) {
+     
       toast.error("Không thể tải dữ liệu dashboard");
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -79,14 +108,24 @@ const RenterDashboard = () => {
         text: "Đã xác nhận",
         icon: CheckCircle,
       },
-      "picked-up": {
+      "in-progress": {
         color: "bg-green-100 text-green-800",
         text: "Đang thuê",
         icon: Car,
       },
-      returned: {
+      pending_return: {
+        color: "bg-purple-100 text-purple-800",
+        text: "Chờ trả xe",
+        icon: Clock,
+      },
+      returning: {
+        color: "bg-indigo-100 text-indigo-800",
+        text: "Đang trả xe",
+        icon: Car,
+      },
+      completed: {
         color: "bg-gray-100 text-gray-800",
-        text: "Đã trả",
+        text: "Hoàn thành",
         icon: CheckCircle,
       },
       cancelled: {
@@ -119,27 +158,7 @@ const RenterDashboard = () => {
       </div>
 
       {/* Verification Alert */}
-      {!user?.isVerified && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-          <div className="flex">
-            <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 mr-3 flex-shrink-0" />
-            <div>
-              <h3 className="text-sm font-medium text-yellow-800 mb-1">
-                Tài khoản chưa được xác thực
-              </h3>
-              <p className="text-sm text-yellow-700 mb-2">
-                Bạn cần upload Giấy phép lái xe và CMND/CCCD để có thể đặt xe.
-              </p>
-              <Link
-                to="/renter/profile"
-                className="text-sm font-medium text-yellow-800 hover:text-yellow-900 underline"
-              >
-                Xác thực ngay →
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      <VerificationAlert />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -153,7 +172,7 @@ const RenterDashboard = () => {
           <div className="text-3xl font-bold text-gray-900 mb-1">
             {loading ? "..." : stats.activeBookings}
           </div>
-          <p className="text-sm text-gray-600">Chuyến đang hoạt động</p>
+          <p className="text-sm text-gray-600">Xe đang thuê</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
@@ -177,9 +196,9 @@ const RenterDashboard = () => {
             <span className="text-sm text-gray-500">Chi tiêu</span>
           </div>
           <div className="text-3xl font-bold text-gray-900 mb-1">
-            {loading ? "..." : `${(stats.totalSpent / 1000000).toFixed(1)}M`}
+            {loading ? "..." : `${stats.totalSpent.toLocaleString("vi-VN")}đ`}
           </div>
-          <p className="text-sm text-gray-600">Tổng chi tiêu (VNĐ)</p>
+          <p className="text-sm text-gray-600">Tổng chi tiêu</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
@@ -203,7 +222,7 @@ const RenterDashboard = () => {
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  Chuyến đang hoạt động
+                  Xe đang thuê
                 </h2>
                 <Link
                   to="/renter/bookings"
@@ -272,7 +291,7 @@ const RenterDashboard = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-lg font-bold text-primary-600">
-                            {booking.totalPrice?.toLocaleString("vi-VN")}đ
+                            {booking.pricing?.totalAmount?.toLocaleString("vi-VN")}đ
                           </div>
                         </div>
                       </div>
@@ -281,7 +300,7 @@ const RenterDashboard = () => {
                         <div className="flex items-center text-gray-600">
                           <Clock className="w-4 h-4 mr-2" />
                           <span>
-                            {new Date(booking.pickupTime).toLocaleDateString(
+                            {new Date(booking.startDate).toLocaleDateString(
                               "vi-VN"
                             )}
                           </span>
@@ -346,7 +365,7 @@ const RenterDashboard = () => {
               </Link>
 
               <Link
-                to="/renter/history"
+                to="/renter/bookings?tab=history"
                 className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors"
               >
                 <div className="flex items-center">

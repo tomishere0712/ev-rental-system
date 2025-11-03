@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
+import { useAuthRefresh } from "./hooks/useAuthRefresh";
+import toast from "react-hot-toast";
 
 // Layouts
 import MainLayout from "./layouts/MainLayout";
@@ -19,7 +21,6 @@ import BookVehiclePage from "./pages/renter/BookVehiclePage";
 import MyBookingsPage from "./pages/renter/MyBookingsPage";
 import BookingDetailPage from "./pages/renter/BookingDetailPage";
 import RenterProfilePage from "./pages/renter/RenterProfilePage";
-import RentalHistoryPage from "./pages/renter/RentalHistoryPage";
 
 // Staff Pages
 import StaffDashboard from "./pages/staff/StaffDashboard";
@@ -27,6 +28,8 @@ import VehicleHandoverPage from "./pages/staff/VehicleHandoverPage";
 import CustomerVerificationPage from "./pages/staff/CustomerVerificationPage";
 import StationVehiclesPage from "./pages/staff/StationVehiclesPage";
 import ProcessPaymentPage from "./pages/staff/ProcessPaymentPage";
+import StaffProfilePage from "./pages/staff/StaffProfilePage";
+import RefundManagementPage from "./pages/staff/RefundManagementPage";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -35,23 +38,40 @@ import ManageStationsPage from "./pages/admin/ManageStationsPage";
 import ManageUsersPage from "./pages/admin/ManageUsersPage";
 import ManageStaffPage from "./pages/admin/ManageStaffPage";
 import ReportsPage from "./pages/admin/ReportsPage";
+import AdminProfilePage from "./pages/admin/AdminProfilePage";
+
+// Payment Pages
+import PaymentSandboxPage from "./pages/payment/PaymentSandboxPage";
+import PaymentResultPage from "./pages/payment/PaymentResultPage";
 
 function App() {
   const { user } = useAuthStore();
 
+  // Auto-refresh user data on app mount/reload
+  useAuthRefresh();
+
   // Protected Route Component
-  // eslint-disable-next-line react/prop-types
+  /* eslint-disable react/prop-types */
   const ProtectedRoute = ({ children, allowedRoles }) => {
+    // Nếu allowedRoles chứa null (cho phép người chưa đăng nhập) và người dùng chưa đăng nhập
+    if (allowedRoles?.includes(null) && !user) {
+      return children;
+    }
+
+    // Nếu cần đăng nhập nhưng chưa đăng nhập
     if (!user) {
       return <Navigate to="/login" replace />;
     }
 
+    // Nếu đã đăng nhập nhưng không có quyền
     if (allowedRoles && !allowedRoles.includes(user.role)) {
+      toast.error("Bạn không có quyền truy cập trang này");
       return <Navigate to="/" replace />;
     }
 
     return children;
   };
+  /* eslint-enable react/prop-types */
 
   return (
     <Routes>
@@ -67,6 +87,13 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
+      {/* Payment Routes (Public for callback) */}
+      <Route path="/payment/sandbox" element={<PaymentSandboxPage />} />
+      <Route path="/payment/success" element={<PaymentResultPage />} />
+      <Route path="/payment/failed" element={<PaymentResultPage />} />
+      <Route path="/payment/additional-success" element={<PaymentResultPage />} />
+      <Route path="/payment/additional-failed" element={<PaymentResultPage />} />
+
       {/* Renter Routes */}
       <Route
         element={
@@ -80,7 +107,6 @@ function App() {
         <Route path="/renter/bookings" element={<MyBookingsPage />} />
         <Route path="/renter/bookings/:id" element={<BookingDetailPage />} />
         <Route path="/renter/profile" element={<RenterProfilePage />} />
-        <Route path="/renter/history" element={<RentalHistoryPage />} />
       </Route>
 
       {/* Staff Routes */}
@@ -96,6 +122,8 @@ function App() {
         <Route path="/staff/verify" element={<CustomerVerificationPage />} />
         <Route path="/staff/vehicles" element={<StationVehiclesPage />} />
         <Route path="/staff/payment" element={<ProcessPaymentPage />} />
+        <Route path="/staff/refund" element={<RefundManagementPage />} />
+        <Route path="/staff/profile" element={<StaffProfilePage />} />
       </Route>
 
       {/* Admin Routes */}
@@ -112,6 +140,7 @@ function App() {
         <Route path="/admin/users" element={<ManageUsersPage />} />
         <Route path="/admin/staff" element={<ManageStaffPage />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
+        <Route path="/admin/profile" element={<AdminProfilePage />} />
       </Route>
 
       {/* 404 */}

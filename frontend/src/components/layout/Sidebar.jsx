@@ -8,7 +8,6 @@ import {
   FileText,
   Calendar,
   User,
-  History,
   CheckCircle,
   CreditCard,
   UserCheck,
@@ -21,8 +20,7 @@ const Sidebar = () => {
   const renterLinks = [
     { to: "/renter/dashboard", icon: LayoutDashboard, label: "Tổng quan" },
     { to: "/renter/book", icon: Calendar, label: "Đặt xe" },
-    { to: "/renter/bookings", icon: FileText, label: "Đơn thuê của tôi" },
-    { to: "/renter/history", icon: History, label: "Lịch sử" },
+    { to: "/renter/bookings", icon: FileText, label: "Quản lý chuyến thuê" },
     { to: "/renter/profile", icon: User, label: "Hồ sơ" },
   ];
 
@@ -32,6 +30,7 @@ const Sidebar = () => {
     { to: "/staff/verify", icon: UserCheck, label: "Xác thực khách hàng" },
     { to: "/staff/vehicles", icon: Car, label: "Xe tại điểm" },
     { to: "/staff/payment", icon: CreditCard, label: "Thanh toán" },
+    { to: "/staff/profile", icon: User, label: "Hồ sơ" },
   ];
 
   const adminLinks = [
@@ -41,6 +40,7 @@ const Sidebar = () => {
     { to: "/admin/users", icon: Users, label: "Quản lý khách hàng" },
     { to: "/admin/staff", icon: UserCheck, label: "Quản lý nhân viên" },
     { to: "/admin/reports", icon: FileText, label: "Báo cáo" },
+    { to: "/admin/profile", icon: User, label: "Hồ sơ" },
   ];
 
   const getLinks = () => {

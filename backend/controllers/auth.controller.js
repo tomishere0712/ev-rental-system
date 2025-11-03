@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
 
 // Generate JWT Token
 const generateToken = (id, role) => {
@@ -16,10 +17,20 @@ exports.register = async (req, res) => {
   try {
     const { email, password, fullName, phone, role } = req.body;
 
-    // Check if user exists
-    const userExists = await User.findOne({ email });
-    if (userExists) {
+    // Check if email exists
+    const emailExists = await User.findOne({ email });
+    if (emailExists) {
       return res.status(400).json({ message: "Email đã được sử dụng" });
+    }
+
+    // Check if phone exists
+    if (phone) {
+      const phoneExists = await User.findOne({ phone });
+      if (phoneExists) {
+        return res
+          .status(400)
+          .json({ message: "Số điện thoại đã được sử dụng" });
+      }
     }
 
     // Create user
@@ -43,6 +54,7 @@ exports.register = async (req, res) => {
         phone: user.phone,
         role: user.role,
         isVerified: user.isVerified,
+        verificationStatus: user.verificationStatus,
         token,
       },
     });
@@ -101,6 +113,8 @@ exports.login = async (req, res) => {
         isVerified: user.isVerified,
         driverLicense: user.driverLicense,
         nationalId: user.nationalId,
+        verificationStatus: user.verificationStatus,
+        verificationNote: user.verificationNote,
         token,
       },
     });
@@ -134,71 +148,141 @@ exports.getMe = async (req, res) => {
 // @access  Private (Renter)
 exports.uploadDocuments = async (req, res) => {
   try {
-    const { driverLicenseNumber, nationalIdNumber } = req.body;
-
-    if (!req.files || (!req.files.driverLicense && !req.files.nationalId)) {
-      return res.status(400).json({ message: "Vui lòng upload giấy tờ" });
-    }
+    const { driverLicenseFront, driverLicenseBack, nationalIdFront, nationalIdBack } = req.files || {};
 
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(404).json({ message: "Người dùng không tồn tại" });
+      return res.status(404).json({
+        success: false,
+        message: "Người dùng không tồn tại",
+      });
     }
 
-    // Upload driver license images to Cloudinary
-    if (req.files.driverLicense) {
-      const driverLicenseImages = [];
-      const files = Array.isArray(req.files.driverLicense)
-        ? req.files.driverLicense
-        : [req.files.driverLicense];
+    // Kiểm tra nếu đang pending thì không cho upload lại
+    if (user.verificationStatus === "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Hồ sơ đang được xét duyệt. Vui lòng chờ kết quả.",
+      });
+    }
 
-      for (const file of files) {
-        const result = await cloudinary.uploader.upload(file.path, {
-          folder: "ev-rental/driver-licenses",
+    // Check if this is first upload or re-upload
+    const hasOldDriverLicense = user.driverLicense && user.driverLicense.images && user.driverLicense.images.length === 2;
+    const hasOldNationalId = user.nationalId && user.nationalId.images && user.nationalId.images.length === 2;
+    const isReupload = hasOldDriverLicense && hasOldNationalId && user.verificationStatus === "rejected";
+
+    // For first upload, require all 4 files
+    if (!isReupload) {
+      if (!driverLicenseFront || !driverLicenseBack || !nationalIdFront || !nationalIdBack) {
+        return res.status(400).json({
+          success: false,
+          message: "Vui lòng upload đầy đủ 4 ảnh: Giấy phép lái xe (2 mặt) và CMND/CCCD (2 mặt)",
         });
-        driverLicenseImages.push(result.secure_url);
       }
-
-      user.driverLicense = {
-        number: driverLicenseNumber,
-        images: driverLicenseImages,
-        verified: false,
-      };
-    }
-
-    // Upload national ID images to Cloudinary
-    if (req.files.nationalId) {
-      const nationalIdImages = [];
-      const files = Array.isArray(req.files.nationalId)
-        ? req.files.nationalId
-        : [req.files.nationalId];
-
-      for (const file of files) {
-        const result = await cloudinary.uploader.upload(file.path, {
-          folder: "ev-rental/national-ids",
+    } else {
+      // For re-upload, require at least 1 file
+      if (!driverLicenseFront && !driverLicenseBack && !nationalIdFront && !nationalIdBack) {
+        return res.status(400).json({
+          success: false,
+          message: "Vui lòng chọn ít nhất 1 ảnh để upload lại",
         });
-        nationalIdImages.push(result.secure_url);
       }
-
-      user.nationalId = {
-        number: nationalIdNumber,
-        images: nationalIdImages,
-        verified: false,
-      };
     }
+
+    // Prepare driver license images (merge new with old if re-upload)
+    const driverLicenseImages = [];
+    
+    // Front image
+    if (driverLicenseFront) {
+      const dlFrontResult = await cloudinary.uploader.upload(driverLicenseFront[0].path, {
+        folder: "ev-rental/driver-licenses",
+        resource_type: "image",
+      });
+      driverLicenseImages.push(dlFrontResult.secure_url);
+      fs.unlinkSync(driverLicenseFront[0].path);
+    } else if (isReupload && hasOldDriverLicense) {
+      // Keep old front image
+      driverLicenseImages.push(user.driverLicense.images[0]);
+    }
+
+    // Back image
+    if (driverLicenseBack) {
+      const dlBackResult = await cloudinary.uploader.upload(driverLicenseBack[0].path, {
+        folder: "ev-rental/driver-licenses",
+        resource_type: "image",
+      });
+      driverLicenseImages.push(dlBackResult.secure_url);
+      fs.unlinkSync(driverLicenseBack[0].path);
+    } else if (isReupload && hasOldDriverLicense) {
+      // Keep old back image
+      driverLicenseImages.push(user.driverLicense.images[1]);
+    }
+
+    user.driverLicense = {
+      number: req.body.driverLicenseNumber || user.driverLicense?.number || "",
+      images: driverLicenseImages,
+      verified: false,
+    };
+
+    // Prepare national ID images (merge new with old if re-upload)
+    const nationalIdImages = [];
+    
+    // Front image
+    if (nationalIdFront) {
+      const nidFrontResult = await cloudinary.uploader.upload(nationalIdFront[0].path, {
+        folder: "ev-rental/national-ids",
+        resource_type: "image",
+      });
+      nationalIdImages.push(nidFrontResult.secure_url);
+      fs.unlinkSync(nationalIdFront[0].path);
+    } else if (isReupload && hasOldNationalId) {
+      // Keep old front image
+      nationalIdImages.push(user.nationalId.images[0]);
+    }
+
+    // Back image
+    if (nationalIdBack) {
+      const nidBackResult = await cloudinary.uploader.upload(nationalIdBack[0].path, {
+        folder: "ev-rental/national-ids",
+        resource_type: "image",
+      });
+      nationalIdImages.push(nidBackResult.secure_url);
+      fs.unlinkSync(nationalIdBack[0].path);
+    } else if (isReupload && hasOldNationalId) {
+      // Keep old back image
+      nationalIdImages.push(user.nationalId.images[1]);
+    }
+
+    user.nationalId = {
+      number: req.body.nationalIdNumber || user.nationalId?.number || "",
+      images: nationalIdImages,
+      verified: false,
+    };
+
+    // Set verification status to pending
+    user.verificationStatus = "pending";
+    user.verificationNote = "";
 
     await user.save();
 
+    // Return updated user without password
+    const updatedUser = await User.findById(user._id).select("-password");
+
     res.json({
       success: true,
-      message: "Upload giấy tờ thành công. Chờ nhân viên xác thực.",
+      message: isReupload 
+        ? "Upload lại giấy tờ thành công! Đang chờ xét duyệt."
+        : "Upload giấy tờ thành công! Đang chờ xét duyệt.",
       data: {
-        driverLicense: user.driverLicense,
-        nationalId: user.nationalId,
+        user: updatedUser,
       },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Upload documents error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
@@ -234,5 +318,72 @@ exports.updateProfile = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Change password
+// @route   PUT /api/auth/change-password
+// @access  Private
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng cung cấp đầy đủ thông tin mật khẩu",
+      });
+    }
+
+    // Check password length
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Mật khẩu mới phải có ít nhất 6 ký tự",
+      });
+    }
+
+    // Get user with password field
+    const user = await User.findById(req.user.id).select("+password");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy người dùng",
+      });
+    }
+
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Mật khẩu hiện tại không đúng",
+      });
+    }
+
+    // Check if new password is same as old password
+    const isSameAsOld = await user.comparePassword(newPassword);
+    if (isSameAsOld) {
+      return res.status(400).json({
+        success: false,
+        message: "Mật khẩu mới không được trùng với mật khẩu cũ",
+      });
+    }
+
+    // Update password (will be hashed by pre-save hook)
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Đổi mật khẩu thành công. Vui lòng đăng nhập lại.",
+    });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi đổi mật khẩu",
+    });
   }
 };

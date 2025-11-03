@@ -81,3 +81,26 @@
 .leaflet-default-icon-path {
   background-image: url(https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png);
 }
+
+/* Custom Station Marker Styles */
+.custom-station-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.custom-station-marker div {
+  transition: all 0.3s ease;
+}
+
+.custom-station-marker:hover div {
+  transform: scale(1.1) rotate(-45deg) !important;
+}
+
+/* Force white text for map popup buttons */
+.leaflet-popup-content a {
+  color: white !important;
+}
+
+.leaflet-popup-content a svg {
+  color: white !important;
+}

@@ -30,6 +30,14 @@ export const authService = {
     const response = await api.put("/auth/profile", data);
     return response.data;
   },
+
+  changePassword: async (currentPassword, newPassword) => {
+    const response = await api.put("/auth/change-password", {
+      currentPassword,
+      newPassword,
+    });
+    return response.data;
+  },
 };
 
 // Station Services
@@ -67,6 +75,11 @@ export const stationService = {
 // Vehicle Services
 export const vehicleService = {
   getAll: async (params) => {
+    const response = await api.get("/vehicles", { params });
+    return response.data;
+  },
+
+  getVehicles: async (params = {}) => {
     const response = await api.get("/vehicles", { params });
     return response.data;
   },
@@ -117,12 +130,53 @@ export const bookingService = {
     const response = await api.get("/bookings/history/analytics");
     return response.data;
   },
+
+  requestReturn: async (id, data) => {
+    const response = await api.post(`/bookings/${id}/request-return`, data);
+    return response.data;
+  },
+
+  confirmRefundReceived: async (id) => {
+    const response = await api.post(`/bookings/${id}/confirm-refund-received`);
+    return response.data;
+  },
+
+  confirmAdditionalPayment: async (id) => {
+    const response = await api.post(`/bookings/${id}/confirm-additional-payment`);
+    return response.data;
+  },
+
+  createAdditionalPaymentUrl: async (id) => {
+    const response = await api.post("/payments/create-vnpay-additional-url", {
+      bookingId: id,
+    });
+    return response.data;
+  },
 };
 
 // Payment Services
 export const paymentService = {
   process: async (data) => {
     const response = await api.post("/payments", data);
+    return response.data;
+  },
+
+  createPaymentLink: async (bookingId) => {
+    const response = await api.post("/payments/create-payment-link", {
+      bookingId,
+    });
+    return response.data;
+  },
+
+  createVNPayUrl: async (bookingId) => {
+    const response = await api.post("/payments/create-vnpay-url", {
+      bookingId,
+    });
+    return response.data;
+  },
+
+  handleCallback: async (data) => {
+    const response = await api.post("/payments/callback", data);
     return response.data;
   },
 
@@ -133,6 +187,265 @@ export const paymentService = {
 
   getById: async (id) => {
     const response = await api.get(`/payments/${id}`);
+    return response.data;
+  },
+};
+
+// Staff Services
+export const staffService = {
+  getStats: async () => {
+    const response = await api.get("/staff/stats");
+    return response.data;
+  },
+
+  getProfile: async () => {
+    const response = await api.get("/auth/me");
+    return response.data;
+  },
+
+  getBookings: async (params) => {
+    const response = await api.get("/staff/bookings", { params });
+    return response.data;
+  },
+
+  getBookingById: async (id) => {
+    const response = await api.get(`/staff/bookings/${id}`);
+    return response.data;
+  },
+
+  verifyCustomer: async (id, data) => {
+    const response = await api.put(`/staff/bookings/${id}/verify`, data);
+    return response.data;
+  },
+
+  handoverVehicle: async (id, data) => {
+    const response = await api.put(`/staff/bookings/${id}/handover`, data);
+    return response.data;
+  },
+
+  returnVehicle: async (id, data) => {
+    const response = await api.put(`/staff/bookings/${id}/return`, data);
+    return response.data;
+  },
+
+  getVehicles: async (params = {}) => {
+    const queryString =
+      Object.keys(params).length > 0
+        ? `?${new URLSearchParams(params).toString()}`
+        : "";
+    const response = await api.get(`/staff/vehicles${queryString}`);
+    return response.data;
+  },
+
+  updateBattery: async (id, data) => {
+    const response = await api.put(`/staff/vehicles/${id}/battery`, data);
+    return response.data;
+  },
+
+ reportVehicleIssue: async (id, data) => {
+  const response = await api.post(`/staff/vehicles/${id}/issue`, data);
+  return response.data;
+},
+
+
+  updateVehicleStatus: async (id, status) => {
+    const response = await api.put(`/staff/vehicles/${id}/status`, { status });
+    return response.data;
+  },
+
+  getPaymentSummary: async (id) => {
+    const response = await api.get(`/staff/bookings/${id}/payment`);
+    return response.data;
+  },
+
+  processPayment: async (data) => {
+    const response = await api.post("/staff/payments", data);
+    return response.data;
+  },
+
+  // 🆕 Verifications
+  getPendingVerifications: async () => {
+    const response = await api.get("/staff/verifications/pending");
+    return response.data;
+  },
+
+  verifyUserDocuments: async (userId, data) => {
+    const response = await api.patch(`/staff/verifications/${userId}`, data);
+    return response.data;
+  },
+  getApprovedVerifications: async () => {
+    const response = await api.get("/staff/verifications/approved");
+    return response.data;
+  },
+
+  getRejectedVerifications: async () => {
+    const response = await api.get("/staff/verifications/rejected");
+    return response.data;
+  },
+
+  reconsiderVerification: async (userId, data) => {
+    const response = await api.patch(
+      `/staff/verifications/${userId}/reconsider`,
+      data
+    );
+    return response.data;
+  },
+  
+  // Confirm additional payment received
+  confirmAdditionalPaymentReceived: async (bookingId) => {
+    const response = await api.post(`/staff/bookings/${bookingId}/confirm-additional-payment`);
+    return response.data;
+  },
+};
+
+// Admin Services
+export const adminService = {
+  // Dashboard Stats
+  getOverviewStats: async () => {
+    const response = await api.get("/admin/stats/overview");
+    return response.data;
+  },
+
+  getRevenueByStation: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get("/admin/stats/revenue-by-station", {
+      params,
+    });
+    return response.data;
+  },
+
+  getBookingsTrend: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get("/admin/stats/bookings-trend", { params });
+    return response.data;
+  },
+
+  getVehicleDistribution: async () => {
+    const response = await api.get("/admin/stats/vehicle-distribution");
+    return response.data;
+  },
+
+  getVehicleUsageByHour: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get("/admin/stats/vehicle-usage-by-hour", {
+      params,
+    });
+    return response.data;
+  },
+
+  getRecentBookings: async (limit = 10) => {
+    const response = await api.get(
+      `/admin/stats/recent-bookings?limit=${limit}`
+    );
+    return response.data;
+  },
+
+  // Vehicles
+  getAllVehicles: async (params) => {
+    const response = await api.get("/admin/vehicles", { params });
+    return response.data;
+  },
+
+  createVehicle: async (data) => {
+    const response = await api.post("/admin/vehicles", data);
+    return response.data;
+  },
+
+  updateVehicle: async (id, data) => {
+    const response = await api.put(`/admin/vehicles/${id}`, data);
+    return response.data;
+  },
+
+  deleteVehicle: async (id) => {
+    const response = await api.delete(`/admin/vehicles/${id}`);
+    return response.data;
+  },
+
+  transferVehicle: async (id, stationId) => {
+    const response = await api.put(`/admin/vehicles/${id}/transfer`, {
+      stationId,
+    });
+    return response.data;
+  },
+
+  // Stations
+  getAllStations: async () => {
+    const response = await api.get("/admin/stations");
+    return response.data;
+  },
+
+  createStation: async (data) => {
+    const response = await api.post("/admin/stations", data);
+    return response.data;
+  },
+
+  updateStation: async (id, data) => {
+    const response = await api.put(`/admin/stations/${id}`, data);
+    return response.data;
+  },
+
+  deleteStation: async (id) => {
+    const response = await api.delete(`/admin/stations/${id}`);
+    return response.data;
+  },
+
+  // Users
+  getAllUsers: async (params) => {
+    const response = await api.get("/admin/users", { params });
+    return response.data;
+  },
+
+  getUserById: async (id) => {
+    const response = await api.get(`/admin/users/${id}`);
+    return response.data;
+  },
+
+  updateUserRiskLevel: async (id, data) => {
+    const response = await api.put(`/admin/users/${id}/risk-level`, data);
+    return response.data;
+  },
+
+  blockUser: async (id, isActive) => {
+    const response = await api.put(`/admin/users/${id}/block`, { isActive });
+    return response.data;
+  },
+
+  // Staff
+  getAllStaff: async () => {
+    const response = await api.get("/admin/staff");
+    return response.data;
+  },
+
+  createStaff: async (data) => {
+    const response = await api.post("/admin/staff", data);
+    return response.data;
+  },
+
+  updateStaff: async (id, data) => {
+    const response = await api.put(`/admin/staff/${id}`, data);
+    return response.data;
+  },
+
+  assignStaffToStation: async (staffId, stationId) => {
+    const response = await api.put(`/admin/staff/${staffId}/assign-station`, {
+      stationId,
+    });
+    return response.data;
+  },
+
+  deleteStaff: async (id) => {
+    const response = await api.delete(`/admin/staff/${id}`);
+    return response.data;
+  },
+
+  getStaffPerformance: async (id) => {
+    const response = await api.get(`/admin/staff/${id}/performance`);
     return response.data;
   },
 };

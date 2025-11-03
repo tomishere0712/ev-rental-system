@@ -27,14 +27,31 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm backdrop-blur-sm bg-white/95">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">⚡</span>
+          <Link to="/" className="flex items-center gap-3 group">
+            {/* Logo image */}
+            <div className="relative">
+              <div className="h-12 w-auto bg-white rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all group-hover:scale-105 overflow-hidden border-2 border-green-100 px-2">
+                <img 
+                  src="https://www.shutterstock.com/image-vector/electric-car-e-plug-green-600nw-2303576823.jpg" 
+                  alt="EV Rental Logo"
+                  className="h-full w-auto object-contain"
+                />
+              </div>
+              {/* Glow effect */}
+              <div className="absolute inset-0 bg-green-400 rounded-xl blur-md opacity-20 group-hover:opacity-30 transition-opacity"></div>
             </div>
-            <span className="text-xl font-bold text-gray-900">EV Rental</span>
+            {/* Text */}
+            <div className="flex flex-col">
+              <span className="text-xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                EV Rental
+              </span>
+              <span className="text-[10px] text-gray-500 font-medium -mt-1">
+                Xe điện xanh
+              </span>
+            </div>
           </Link>
 
           {/* Desktop Navigation */}

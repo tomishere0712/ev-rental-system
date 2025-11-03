@@ -12,6 +12,8 @@ exports.getVehicles = async (req, res) => {
       status,
       minPrice,
       maxPrice,
+      minBattery,
+      search,
       page = 1,
       limit = 12,
     } = req.query;
@@ -21,13 +23,36 @@ exports.getVehicles = async (req, res) => {
 
     if (station) filter.currentStation = station;
     if (type) filter.type = type;
-    if (status) filter.status = status;
-    else filter.status = "available"; // Default show available only
+
+    // Status filter
+    if (status) {
+      // Support 'all' to show all vehicles regardless of status (for staff/admin)
+      if (status !== "all") {
+        filter.status = status;
+      }
+      // If status = 'all', don't add status filter
+    } else {
+      // Default: show available only for public users
+      filter.status = "available";
+    }
 
     if (minPrice || maxPrice) {
       filter.pricePerHour = {};
       if (minPrice) filter.pricePerHour.$gte = Number(minPrice);
       if (maxPrice) filter.pricePerHour.$lte = Number(maxPrice);
+    }
+
+    // Battery filter
+    if (minBattery) {
+      filter.currentBatteryLevel = { $gte: Number(minBattery) };
+    }
+
+    // Search filter (name or model)
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { model: { $regex: search, $options: "i" } },
+      ];
     }
 
     // Pagination
@@ -43,12 +68,11 @@ exports.getVehicles = async (req, res) => {
 
     res.json({
       success: true,
-      data: vehicles,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
+      data: {
+        vehicles,
         total,
-        pages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limit),
+        currentPage: Number(page),
       },
     });
   } catch (error) {
