@@ -365,7 +365,7 @@ const RenterDashboard = () => {
               </Link>
 
               <Link
-                to="/renter/history"
+                to="/renter/bookings?tab=history"
                 className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors"
               >
                 <div className="flex items-center">
