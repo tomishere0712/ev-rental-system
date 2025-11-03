@@ -290,8 +290,14 @@ const AdminDashboard = () => {
                       {booking.vehicle?.brand} {booking.vehicle?.model}
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-green-600">
-                      ${booking.totalAmount}
+                      {booking.totalAmount
+                        ? booking.totalAmount.toLocaleString("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        })
+                        : "N/A"}
                     </td>
+
                     <td className="px-4 py-3 text-sm">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-semibold ${getBookingStatusBadge(

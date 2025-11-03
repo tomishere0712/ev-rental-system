@@ -317,7 +317,10 @@ exports.getRecentBookings = async (req, res) => {
       bookingNumber: booking.bookingNumber,
       user: booking.renter,
       vehicle: booking.vehicle,
-      totalAmount: booking.totalAmount,
+      totalAmount:
+    booking?.pricing?.totalAmount ||
+    booking?.payment?.amount ||
+    0, // fallback nếu chưa có dữ liệu
       status: booking.status,
     }));
 

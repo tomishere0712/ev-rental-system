@@ -39,7 +39,7 @@ const Sidebar = () => {
     { to: "/admin/stations", icon: MapPin, label: "Quản lý điểm thuê" },
     { to: "/admin/users", icon: Users, label: "Quản lý khách hàng" },
     { to: "/admin/staff", icon: UserCheck, label: "Quản lý nhân viên" },
-    { to: "/admin/reports", icon: FileText, label: "Báo cáo" },
+    // { to: "/admin/reports", icon: FileText, label: "Báo cáo" },
     { to: "/admin/profile", icon: User, label: "Hồ sơ" },
   ];
 
