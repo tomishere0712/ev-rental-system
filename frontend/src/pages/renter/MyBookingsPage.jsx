@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { bookingService, paymentService } from "../../services";
 import VerificationAlert from "../../components/VerificationAlert";
 import {
@@ -19,7 +19,9 @@ import {
 import toast from "react-hot-toast";
 
 const MyBookingsPage = () => {
-  const [activeTab, setActiveTab] = useState("active");
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(tabFromUrl === "history" ? "history" : "active");
   const [bookings, setBookings] = useState([]);
   const [history, setHistory] = useState([]);
   const [analytics, setAnalytics] = useState(null);
