@@ -516,6 +516,9 @@ exports.createVNPayAdditionalUrl = async (req, res) => {
     const orderId = `ADDITIONAL_${Date.now()}`;
     const amount = booking.additionalPayment.amount;
     const orderInfo = `Chi phi phat sinh don thue ${booking.vehicle?.name} - ${bookingId.slice(-8)}`;
+    
+    // Use separate return URL for additional payment
+    const returnUrl = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/payments/vnpay-additional-return`;
 
     // Create VNPay payment URL
     const paymentUrl = vnpayHelper.createPaymentUrl({
@@ -524,16 +527,37 @@ exports.createVNPayAdditionalUrl = async (req, res) => {
       orderInfo: orderInfo,
       ipAddr: ipAddr,
       locale: "vn",
+      returnUrl: returnUrl, // Pass custom return URL
     });
 
     console.log("=== VNPay Additional Payment URL Created ===");
     console.log("Order ID:", orderId);
     console.log("Amount:", amount);
     console.log("Booking ID:", bookingId);
+    console.log("Return URL:", returnUrl);
 
     // Save orderId to additionalPayment for callback verification
-    booking.additionalPayment.orderId = orderId;
-    await booking.save();
+    console.log("💾 Saving orderId to booking...");
+    console.log("Before save - additionalPayment:", JSON.stringify(booking.additionalPayment, null, 2));
+    
+    try {
+      // Set orderId
+      booking.additionalPayment.orderId = orderId;
+      
+      // Mark subdocument as modified (important for nested objects in Mongoose)
+      booking.markModified('additionalPayment');
+      
+      const savedBooking = await booking.save();
+      console.log("✅ OrderId saved successfully");
+      console.log("After save - additionalPayment.orderId:", savedBooking.additionalPayment.orderId);
+      
+      // Verify by re-querying from database
+      const verifyBooking = await Booking.findById(bookingId).select('additionalPayment');
+      console.log("🔍 Verification - orderId in DB:", verifyBooking.additionalPayment.orderId);
+    } catch (saveError) {
+      console.error("❌ Error saving orderId to booking:", saveError);
+      throw saveError;
+    }
 
     res.json({
       success: true,
@@ -587,10 +611,19 @@ exports.vnpayAdditionalReturn = async (req, res) => {
     console.log("Amount:", amount);
 
     // Find booking by additionalPayment.orderId
+    console.log("🔍 Searching for booking with additionalPayment.orderId:", orderId);
     const booking = await Booking.findOne({ "additionalPayment.orderId": orderId });
 
     if (!booking) {
       console.error("❌ Booking not found with orderId:", orderId);
+      
+      // Debug: Try to find any booking with pending additional payment
+      const anyPendingBooking = await Booking.findOne({ 
+        "additionalPayment.status": "pending" 
+      }).select("_id bookingCode additionalPayment");
+      
+      console.log("📋 Found pending additional payment booking:", anyPendingBooking);
+      
       return res.status(404).json({
         success: false,
         message: "Không tìm thấy đơn thuê",
@@ -604,21 +637,22 @@ exports.vnpayAdditionalReturn = async (req, res) => {
       // Payment success
       console.log("✅ Additional Payment SUCCESS - Updating booking...");
       
-      booking.additionalPayment.status = "completed";
+      booking.additionalPayment.status = "paid";
       booking.additionalPayment.transactionId = transactionNo;
       booking.additionalPayment.paidAt = new Date();
       booking.additionalPayment.method = "vnpay";
 
       // Update depositRefund status
       booking.depositRefund.status = "not_applicable";
+      booking.depositRefund.amount = 0;
       booking.depositRefund.notes = `Chi phí phát sinh đã thanh toán thành công qua VNPAY. Mã GD: ${transactionNo}`;
 
-      // Move booking to refund_pending (waiting for staff to complete)
+      // Move booking to refund_pending (waiting for staff to confirm receipt)
       booking.status = "refund_pending";
       
       await booking.save();
 
-      console.log("✅ Booking updated successfully");
+      console.log("✅ Booking updated successfully - Status: refund_pending, additionalPayment.status: paid");
 
       // Redirect to success page
       const redirectUrl = `${process.env.CLIENT_URL}/payment/additional-success?bookingId=${booking._id}&orderId=${orderId}`;

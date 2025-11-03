@@ -44,8 +44,39 @@ const StaffDashboard = () => {
         console.log("📋 Booking statuses:", bookingsResponse.data.map(b => ({
           number: b.bookingNumber,
           status: b.status,
+          additionalPayment: b.additionalPayment,
+          depositRefund: b.depositRefund,
           renter: b.renter?.fullName || b.renter?.email
         })));
+        
+        // Debug: Log bookings in refund_pending status
+        const refundPendingBookings = bookingsResponse.data.filter(b => b.status === "refund_pending");
+        console.log("🔍 Bookings with refund_pending status:", refundPendingBookings.length);
+        refundPendingBookings.forEach(b => {
+          console.log(`📦 Booking ${b.bookingNumber}:`, {
+            status: b.status,
+            additionalPaymentStatus: b.additionalPayment?.status,
+            additionalPaymentAmount: b.additionalPayment?.amount,
+            depositRefundStatus: b.depositRefund?.status,
+            depositRefundAmount: b.depositRefund?.amount
+          });
+        });
+        
+        // Debug: Log bookings with paid additional payment
+        const paidAdditionalBookings = bookingsResponse.data.filter(b => 
+          b.status === "refund_pending" && 
+          (b.additionalPayment?.status === "paid" || b.additionalPayment?.status === "completed")
+        );
+        console.log("💳 Bookings with PAID additional payment:", paidAdditionalBookings.length);
+        paidAdditionalBookings.forEach(b => {
+          console.log(`✅ PAID: Booking ${b.bookingNumber}:`, {
+            status: b.status,
+            additionalPaymentStatus: b.additionalPayment?.status,
+            additionalPaymentAmount: b.additionalPayment?.amount,
+            paidAt: b.additionalPayment?.paidAt,
+            transactionId: b.additionalPayment?.transactionId
+          });
+        });
       }
 
       setStats(statsResponse.data);
@@ -80,7 +111,7 @@ const StaffDashboard = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, booking) => {
     const config = {
       pending: {
         label: "Chờ xác thực",
@@ -89,7 +120,29 @@ const StaffDashboard = () => {
       confirmed: { label: "Đã xác thực", color: "bg-blue-100 text-blue-800" },
       "in-progress": { label: "Đang thuê", color: "bg-green-100 text-green-800" },
       "pending_return": { label: "Chờ trả xe", color: "bg-orange-100 text-orange-800" },
-      "refund_pending": { label: "Chờ hoàn cọc", color: "bg-purple-100 text-purple-800" },
+      "refund_pending": { 
+        label: (() => {
+          // Check if customer paid additional charges
+          if (booking?.additionalPayment?.status === "paid" || booking?.additionalPayment?.status === "completed") {
+            return "✅ Khách đã thanh toán";
+          }
+          // Check if customer needs to pay additional
+          if (booking?.additionalPayment?.status === "pending") {
+            return "⏳ Chờ khách thanh toán";
+          }
+          // Normal refund case
+          return "Chờ hoàn cọc";
+        })(),
+        color: (() => {
+          if (booking?.additionalPayment?.status === "paid" || booking?.additionalPayment?.status === "completed") {
+            return "bg-emerald-100 text-emerald-800";
+          }
+          if (booking?.additionalPayment?.status === "pending") {
+            return "bg-orange-100 text-orange-800";
+          }
+          return "bg-purple-100 text-purple-800";
+        })()
+      },
       completed: { label: "Hoàn thành", color: "bg-gray-100 text-gray-800" },
     };
     const { label, color } = config[status] || config.pending;
@@ -137,11 +190,30 @@ const StaffDashboard = () => {
           color="green"
         />
         <StatCard
-          title="Lịch hôm nay"
-          value={`${stats?.todayPickups || 0} / ${stats?.todayReturns || 0}`}
-          icon={Calendar}
-          color="blue"
-          subtitle="Giao / Nhận"
+          title="Chờ xử lý thanh toán"
+          value={
+            (() => {
+              const count = bookings.filter(b => {
+                // Refund pending with customer paid additional
+                if (b.status === "refund_pending") {
+                  const customerPaid = b.additionalPayment?.status === "paid" || b.additionalPayment?.status === "completed";
+                  console.log(`📊 Counting booking ${b.bookingNumber}:`, {
+                    status: b.status,
+                    additionalPaymentStatus: b.additionalPayment?.status,
+                    customerPaid,
+                    willCount: customerPaid
+                  });
+                  return customerPaid;
+                }
+                return false;
+              }).length;
+              console.log(`📊 Total "Chờ xử lý thanh toán" count: ${count}`);
+              return count;
+            })()
+          }
+          icon={DollarSign}
+          color="emerald"
+          link="/staff/payment"
         />
         <StatCard
           title="Xe khả dụng"
@@ -204,6 +276,78 @@ const StaffDashboard = () => {
               <p className="text-sm text-gray-600">Xử lý hoàn cọc</p>
             </div>
           </Link>
+        </div>
+      </div>
+
+      {/* Payment Status Overview */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">
+          Tổng quan thanh toán
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Customer Paid - Need Confirmation */}
+          <div className="bg-emerald-50 border-2 border-emerald-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-emerald-900">✅ Khách đã thanh toán</h3>
+              <span className="text-2xl font-bold text-emerald-600">
+                {(() => {
+                  const count = bookings.filter(b => 
+                    b.status === "refund_pending" && 
+                    (b.additionalPayment?.status === "paid" || b.additionalPayment?.status === "completed")
+                  ).length;
+                  console.log(`📊 Card "Khách đã thanh toán" count: ${count}`);
+                  return count;
+                })()}
+              </span>
+            </div>
+            <p className="text-sm text-emerald-700">Cần xác nhận đã nhận tiền</p>
+            <Link 
+              to="/staff/payment" 
+              className="mt-3 inline-block text-sm font-medium text-emerald-600 hover:text-emerald-700"
+            >
+              Xử lý ngay →
+            </Link>
+          </div>
+
+          {/* Waiting for Customer Payment */}
+          <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-orange-900">⏳ Chờ khách thanh toán</h3>
+              <span className="text-2xl font-bold text-orange-600">
+                {bookings.filter(b => {
+                  if (b.status !== "refund_pending") return false;
+                  const deposit = b.pricing?.deposit || 0;
+                  const additionalCharges = b.pricing?.additionalCharges?.reduce((sum, c) => sum + c.amount, 0) || 0;
+                  const requiresPayment = additionalCharges > deposit;
+                  const customerPaid = b.additionalPayment?.status === "paid" || b.additionalPayment?.status === "completed";
+                  return requiresPayment && !customerPaid;
+                }).length}
+              </span>
+            </div>
+            <p className="text-sm text-orange-700">Đang chờ thanh toán VNPAY</p>
+          </div>
+
+          {/* Need Refund */}
+          <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-purple-900">💰 Cần hoàn cọc</h3>
+              <span className="text-2xl font-bold text-purple-600">
+                {bookings.filter(b => {
+                  if (b.status !== "refund_pending") return false;
+                  const deposit = b.pricing?.deposit || 0;
+                  const additionalCharges = b.pricing?.additionalCharges?.reduce((sum, c) => sum + c.amount, 0) || 0;
+                  return additionalCharges <= deposit;
+                }).length}
+              </span>
+            </div>
+            <p className="text-sm text-purple-700">Staff cần chuyển tiền hoàn cọc</p>
+            <Link 
+              to="/staff/refund" 
+              className="mt-3 inline-block text-sm font-medium text-purple-600 hover:text-purple-700"
+            >
+              Xử lý ngay →
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -284,7 +428,7 @@ const StaffDashboard = () => {
                       {new Date(booking.startDate).toLocaleDateString("vi-VN")}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(booking.status)}
+                      {getStatusBadge(booking.status, booking)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {booking.status === "pending" && (
@@ -317,6 +461,19 @@ const StaffDashboard = () => {
                           className="text-orange-600 hover:text-orange-700 font-medium"
                         >
                           Xử lý trả xe
+                        </Link>
+                      )}
+                      {booking.status === "refund_pending" && (
+                        <Link
+                          to="/staff/refund"
+                          className="text-purple-600 hover:text-purple-700 font-medium"
+                        >
+                          {booking.additionalPayment?.status === "paid" || booking.additionalPayment?.status === "completed" 
+                            ? "Xác nhận đã nhận tiền"
+                            : booking.additionalPayment?.status === "pending"
+                            ? "Chờ khách thanh toán"
+                            : "Xử lý hoàn cọc"
+                          }
                         </Link>
                       )}
                     </td>

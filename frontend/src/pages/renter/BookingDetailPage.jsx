@@ -88,8 +88,13 @@ const BookingDetailPage = () => {
         icon: Car,
       },
       refund_pending: {
-        color: "bg-pink-100 text-pink-800 border-pink-200",
-        text: "Chờ xác nhận hoàn tiền",
+        // Check if user paid additional charges - show different text
+        color: booking?.additionalPayment?.status === "paid" 
+          ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+          : "bg-pink-100 text-pink-800 border-pink-200",
+        text: booking?.additionalPayment?.status === "paid"
+          ? "Chờ staff xác nhận thanh toán"
+          : "Chờ xác nhận hoàn tiền",
         icon: Clock,
       },
       completed: {
@@ -202,9 +207,68 @@ const BookingDetailPage = () => {
             </h1>
             <p className="text-gray-600">#{booking.bookingNumber}</p>
           </div>
-          {getStatusBadge(booking.status)}
+          {(() => {
+            // Dynamic status badge based on payment status
+            if (booking.status === "refund_pending" && (booking.additionalPayment?.status === "paid" || booking.additionalPayment?.status === "completed")) {
+              return (
+                <span className="px-4 py-2 rounded-full text-sm font-semibold inline-flex items-center border bg-emerald-100 text-emerald-800 border-emerald-200">
+                  <Clock className="w-4 h-4 mr-2" />
+                  Chờ staff xác nhận thanh toán
+                </span>
+              );
+            }
+            return getStatusBadge(booking.status);
+          })()}
         </div>
       </div>
+
+      {/* Additional Payment Success Banner - User paid additional charges via VNPAY */}
+      {booking.status === "refund_pending" && 
+       booking.additionalPayment && 
+       (booking.additionalPayment.status === "paid" || booking.additionalPayment.status === "completed") && (
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 mb-6 shadow-lg">
+          <div className="flex items-start gap-4">
+            <div className="bg-green-600 p-3 rounded-full">
+              <CheckCircle className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-green-900 mb-2">
+                ✅ Đã thanh toán chi phí phát sinh thành công
+              </h3>
+              <p className="text-green-800 mb-3">
+                Bạn đã thanh toán{" "}
+                <span className="font-bold text-lg text-green-700">
+                  {booking.additionalPayment.amount?.toLocaleString("vi-VN")}đ
+                </span>{" "}
+                qua VNPAY. Đang chờ staff xác nhận đã nhận được thanh toán.
+              </p>
+              <div className="bg-white rounded-lg p-4 mb-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Mã giao dịch:</span>
+                  <span className="font-semibold text-gray-900 font-mono">
+                    {booking.additionalPayment.transactionId}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Thời gian thanh toán:</span>
+                  <span className="font-semibold text-gray-900">
+                    {new Date(booking.additionalPayment.paidAt).toLocaleString("vi-VN")}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Phương thức:</span>
+                  <span className="font-semibold text-gray-900 uppercase">
+                    {booking.additionalPayment.method}
+                  </span>
+                </div>
+              </div>
+              <p className="text-sm text-green-700">
+                💡 Staff sẽ xác nhận đã nhận được thanh toán và hoàn tất đơn thuê của bạn.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Refund Pending Banner - Waiting for staff to transfer money */}
       {booking.status === "refund_pending" && 
@@ -558,137 +622,121 @@ const BookingDetailPage = () => {
             {booking.pricing?.additionalCharges && booking.pricing.additionalCharges.length > 0 && (
               <>
                 <div className="border-t border-gray-200 pt-3">
-                  <h4 className="font-semibold text-gray-900 mb-2">Chi phí phát sinh</h4>
-                  {booking.pricing.additionalCharges.map((charge, idx) => (
-                    <div key={idx} className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <span className="text-gray-600 text-sm block">
-                          {charge.type === 'late_fee' && '⏰ Phí trả muộn'}
-                          {charge.type === 'cleaning' && '🧹 Phí vệ sinh'}
-                          {charge.type === 'repair' && '🔧 Phí sửa chữa'}
-                          {charge.type !== 'late_fee' && charge.type !== 'cleaning' && charge.type !== 'repair' && charge.type}
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <span className="font-semibold text-gray-900 block">Chi phí phát sinh</span>
+                      {booking.returnRequest?.notes && (
+                        <span className="text-gray-500 text-xs mt-1 block">
+                          {booking.returnRequest.notes}
                         </span>
-                        {charge.description && (
-                          <span className="text-gray-500 text-xs">{charge.description}</span>
-                        )}
-                      </div>
-                      <span className="text-red-600 font-medium ml-2">
-                        +{charge.amount?.toLocaleString("vi-VN")}đ
-                      </span>
+                      )}
                     </div>
-                  ))}
+                    <span className="text-red-600 font-bold text-lg ml-2">
+                      +{booking.pricing.additionalCharges.reduce((sum, charge) => sum + (charge.amount || 0), 0).toLocaleString("vi-VN")}đ
+                    </span>
+                  </div>
                 </div>
               </>
             )}
 
-            {/* Additional Payment Info */}
-            {(() => {
-              console.log("🔍 Checking additionalPayment:", booking.additionalPayment);
-              console.log("🔍 Has additionalPayment?", !!booking.additionalPayment);
-              return null;
-            })()}
-            {booking.additionalPayment && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <h4 className="font-semibold text-yellow-900 mb-2 flex items-center">
+            {/* Additional Payment Info - Only show if payment is completed (paid status) */}
+            {booking.additionalPayment && (booking.additionalPayment.status === 'paid' || booking.additionalPayment.status === 'completed') && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <h4 className="font-semibold text-green-900 mb-2 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
                   Thanh toán bổ sung
                 </h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-yellow-700">Số tiền đã thanh toán:</span>
-                    <span className="font-bold text-yellow-900">
+                    <span className="text-green-700">Số tiền đã thanh toán:</span>
+                    <span className="font-bold text-green-900">
                       {booking.additionalPayment.amount?.toLocaleString("vi-VN")}đ
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-yellow-700">Mã giao dịch:</span>
-                    <span className="font-mono text-yellow-900">
+                    <span className="text-green-700">Mã giao dịch:</span>
+                    <span className="font-mono text-green-900">
                       {booking.additionalPayment.transactionId}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-yellow-700">Thời gian:</span>
-                    <span className="text-yellow-900">
+                    <span className="text-green-700">Thời gian:</span>
+                    <span className="text-green-900">
                       {new Date(booking.additionalPayment.paidAt).toLocaleString("vi-VN")}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-yellow-700">Phương thức:</span>
-                    <span className="text-yellow-900">
-                      {booking.additionalPayment.method === 'bank_transfer' ? 'Chuyển khoản' : booking.additionalPayment.method}
+                    <span className="text-green-700">Phương thức:</span>
+                    <span className="text-green-900 uppercase">
+                      {booking.additionalPayment.method}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-yellow-700">Trạng thái:</span>
-                    <span className={`font-semibold ${
-                      booking.additionalPayment.status === 'confirmed' ? 'text-green-700' :
-                      booking.additionalPayment.status === 'pending' ? 'text-orange-700' : 'text-green-700'
-                    }`}>
-                      {booking.additionalPayment.status === 'confirmed' && '✅ Đã xác nhận'}
-                      {booking.additionalPayment.status === 'pending' && '⏳ Chờ xác nhận'}
-                      {booking.additionalPayment.status === 'paid' && '✅ Đã thanh toán'}
+                    <span className="text-green-700">Trạng thái:</span>
+                    <span className="font-semibold text-green-700">
+                      ✅ Đã thanh toán thành công
                     </span>
                   </div>
-                  {booking.additionalPayment.confirmedAt && (
-                    <div className="flex justify-between">
-                      <span className="text-yellow-700">Xác nhận lúc:</span>
-                      <span className="text-yellow-900">
-                        {new Date(booking.additionalPayment.confirmedAt).toLocaleString("vi-VN")}
-                      </span>
-                    </div>
-                  )}
+                </div>
+                <div className="mt-2 text-xs text-green-700 bg-green-100 p-2 rounded">
+                  💡 Chi phí phát sinh đã vượt số tiền cọc. Bạn đã thanh toán đủ chi phí bổ sung.
                 </div>
               </div>
             )}
 
             {/* Deposit Refund Info */}
             {(() => {
-              console.log("🔍 Checking depositRefund:", booking.depositRefund);
-              console.log("🔍 Has depositRefund?", !!booking.depositRefund);
+              // Calculate deposit refund amount
+              const deposit = booking.pricing?.deposit || 0;
+              const totalCharges = booking.pricing?.additionalCharges?.reduce((sum, charge) => sum + (charge.amount || 0), 0) || 0;
+              const refundAmount = booking.depositRefund?.amount !== undefined 
+                ? booking.depositRefund.amount 
+                : (booking.status === 'pending_return' ? 0 : Math.max(0, deposit - totalCharges));
+              
+              console.log("🔍 Deposit refund calculation:", { deposit, totalCharges, refundAmount, depositRefund: booking.depositRefund });
+              
+              // Only show if booking has been returned or has depositRefund info
+              if ((booking.depositRefund && booking.depositRefund.status !== 'pending_payment') || booking.status === 'pending_return') {
+                return (
+                  <div className={`border-t border-gray-200 pt-3 ${
+                    booking.depositRefund?.status === 'not_applicable' ? 'bg-orange-50 -mx-6 -mb-6 p-6 mt-3 rounded-b-lg border-2 border-orange-200' : ''
+                  }`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <span className={`font-semibold ${
+                          refundAmount === 0 ? 'text-orange-900' : 'text-gray-900'
+                        }`}>
+                          {refundAmount === 0 ? '⚠️ Không hoàn tiền cọc' : 'Hoàn tiền cọc'}
+                        </span>
+                        {booking.depositRefund?.notes && (
+                          <p className={`text-xs mt-1 ${
+                            refundAmount === 0 ? 'text-orange-700' : 'text-gray-600'
+                          }`}>
+                            {booking.depositRefund.notes}
+                          </p>
+                        )}
+                        {booking.status === 'pending_return' && !booking.depositRefund && (
+                          <p className="text-xs text-gray-600 mt-1">
+                            💡 Chờ staff kiểm tra xe và tính toán chi phí phát sinh
+                          </p>
+                        )}
+                        {refundAmount === 0 && (booking.additionalPayment?.status === 'paid' || booking.additionalPayment?.status === 'completed') && (
+                          <p className="text-xs text-orange-600 mt-2 font-semibold">
+                            💡 Tiền cọc đã được dùng để trừ vào chi phí phát sinh ({totalCharges.toLocaleString("vi-VN")}đ)
+                          </p>
+                        )}
+                      </div>
+                      <span className={`text-lg font-bold ${
+                        refundAmount === 0 ? 'text-orange-600' : 'text-blue-600'
+                      }`}>
+                        {refundAmount.toLocaleString("vi-VN")}đ
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
               return null;
             })()}
-            {/* Show deposit refund - 0đ if pending_return, actual amount after staff processes */}
-            {(booking.depositRefund && booking.depositRefund.status !== 'pending_payment') || 
-             booking.status === 'pending_return' ? (
-              <div className={`border-t border-gray-200 pt-3 ${
-                booking.depositRefund?.status === 'not_applicable' ? 'bg-orange-50 -mx-6 -mb-6 p-6 mt-3 rounded-b-lg border-2 border-orange-200' : ''
-              }`}>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <span className={`font-semibold ${
-                      booking.depositRefund?.amount === 0 ? 'text-orange-900' : 'text-gray-900'
-                    }`}>
-                      {booking.depositRefund?.amount === 0 ? '⚠️ Không hoàn tiền cọc' : 'Hoàn tiền cọc'}
-                    </span>
-                    {booking.depositRefund?.notes && (
-                      <p className={`text-xs mt-1 ${
-                        booking.depositRefund.amount === 0 ? 'text-orange-700' : 'text-gray-600'
-                      }`}>
-                        {booking.depositRefund.notes}
-                      </p>
-                    )}
-                    {booking.status === 'pending_return' && !booking.depositRefund && (
-                      <p className="text-xs text-gray-600 mt-1">
-                        💡 Chờ staff kiểm tra xe và tính toán chi phí phát sinh
-                      </p>
-                    )}
-                    {booking.depositRefund?.amount === 0 && booking.depositRefund?.status === 'not_applicable' && (
-                      <p className="text-xs text-orange-600 mt-2 font-semibold">
-                        💡 Chi phí phát sinh đã vượt số tiền cọc. Bạn đã thanh toán đủ chi phí bổ sung.
-                      </p>
-                    )}
-                  </div>
-                  <span className={`text-lg font-bold ${
-                    booking.depositRefund?.amount === 0 ? 'text-orange-600' : 'text-blue-600'
-                  }`}>
-                    {booking.depositRefund?.amount !== undefined 
-                      ? booking.depositRefund.amount.toLocaleString("vi-VN")
-                      : '0'
-                    }đ
-                  </span>
-                </div>
-              </div>
-            ) : null}
 
             <div className="border-t border-gray-200 pt-3">
               <div className="flex justify-between items-center">
@@ -696,8 +744,19 @@ const BookingDetailPage = () => {
                   Tổng cộng
                 </span>
                 <span className="text-2xl font-bold text-green-600">
-                  {booking.pricing?.totalAmount?.toLocaleString("vi-VN")}đ
+                  {(() => {
+                    // Tổng cộng = Giá thuê + Chi phí phát sinh
+                    // (Không cộng tiền cọc vì nó đã được trừ vào chi phí phát sinh)
+                    const basePrice = booking.pricing?.basePrice || 0;
+                    const additionalCharges = booking.pricing?.additionalCharges?.reduce((sum, charge) => sum + (charge.amount || 0), 0) || 0;
+                    const grandTotal = basePrice + additionalCharges;
+                    console.log("💰 Grand Total Calculation:", { basePrice, additionalCharges, grandTotal });
+                    return grandTotal.toLocaleString("vi-VN");
+                  })()}đ
                 </span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1 text-right">
+                (Giá thuê {booking.pricing?.basePrice?.toLocaleString("vi-VN")}đ + Chi phí phát sinh {booking.pricing?.additionalCharges?.reduce((sum, charge) => sum + (charge.amount || 0), 0)?.toLocaleString("vi-VN") || 0}đ)
               </div>
             </div>
           </div>

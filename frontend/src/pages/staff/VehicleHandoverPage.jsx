@@ -263,11 +263,23 @@ const VehicleHandoverPage = () => {
     setLateFees(0);
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, booking) => {
     const badges = {
       confirmed: { bg: "bg-blue-100", text: "text-blue-800", label: "Đã xác nhận" },
       "in-progress": { bg: "bg-green-100", text: "text-green-800", label: "Đang thuê" },
       pending_return: { bg: "bg-yellow-100", text: "text-yellow-800", label: "Chờ trả xe" },
+      refund_pending: (() => {
+        // Check if customer paid additional charges
+        if (booking?.additionalPayment?.status === "paid" || booking?.additionalPayment?.status === "completed") {
+          return { bg: "bg-emerald-100", text: "text-emerald-800", label: "✅ Khách đã thanh toán" };
+        }
+        // Check if customer needs to pay additional
+        if (booking?.additionalPayment?.status === "pending") {
+          return { bg: "bg-orange-100", text: "text-orange-800", label: "⏳ Chờ khách thanh toán" };
+        }
+        // Normal refund case
+        return { bg: "bg-purple-100", text: "text-purple-800", label: "Chờ hoàn cọc" };
+      })(),
     };
     return badges[status] || { bg: "bg-gray-100", text: "text-gray-800", label: status };
   };
@@ -359,7 +371,7 @@ const VehicleHandoverPage = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {bookings.map((booking) => {
-                    const statusBadge = getStatusBadge(booking.status);
+                    const statusBadge = getStatusBadge(booking.status, booking);
                     return (
                       <tr key={booking._id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -450,10 +462,11 @@ const VehicleHandoverPage = () => {
             </div>
             <span
               className={`px-4 py-1 rounded-full text-sm font-semibold ${getStatusBadge(
-                selectedBooking.status
-              ).bg} ${getStatusBadge(selectedBooking.status).text}`}
+                selectedBooking.status,
+                selectedBooking
+              ).bg} ${getStatusBadge(selectedBooking.status, selectedBooking).text}`}
             >
-              {getStatusBadge(selectedBooking.status).label}
+              {getStatusBadge(selectedBooking.status, selectedBooking).label}
             </span>
           </div>
 

@@ -26,6 +26,10 @@ router.post(
   "/bookings/:id/confirm-refund",
   staffController.confirmManualRefund
 );
+router.post(
+  "/bookings/:id/confirm-additional-payment",
+  staffController.confirmAdditionalPaymentReceived
+);
 router.get("/bookings/:id/payment", staffController.getPaymentSummary);
 
 // Vehicles

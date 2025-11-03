@@ -1006,6 +1006,61 @@ exports.confirmManualRefund = async (req, res) => {
   }
 };
 
+// @desc    Staff confirms they received additional payment from customer (when charges > deposit)
+// @route   POST /api/staff/bookings/:id/confirm-additional-payment
+// @access  Private/Staff
+exports.confirmAdditionalPaymentReceived = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id).populate(
+      "renter",
+      "email fullName"
+    );
+
+    if (!booking) {
+      return res.status(404).json({ message: "Không tìm thấy booking" });
+    }
+
+    // Check booking is in refund_pending state
+    if (booking.status !== "refund_pending") {
+      return res.status(400).json({
+        message: "Booking không ở trạng thái chờ xử lý. Status: " + booking.status,
+      });
+    }
+
+    // Check additional payment exists and is completed
+    if (!booking.additionalPayment || (booking.additionalPayment.status !== "paid" && booking.additionalPayment.status !== "completed")) {
+      return res.status(400).json({
+        message: "Khách hàng chưa thanh toán chi phí phát sinh qua VNPAY",
+      });
+    }
+
+    // Mark deposit refund as not applicable (no refund since charges exceeded deposit)
+    booking.depositRefund = {
+      amount: 0,
+      method: "none",
+      status: "not_applicable",
+      notes: `Chi phí phát sinh ${booking.additionalPayment.amount}đ vượt tiền cọc. Khách đã thanh toán bổ sung qua VNPAY.`,
+    };
+
+    // Move booking to completed
+    booking.status = "completed";
+    booking.completedAt = new Date();
+
+    await booking.save();
+
+    console.log(`✅ Booking ${booking.bookingCode} completed after additional payment confirmation`);
+
+    res.json({
+      success: true,
+      data: booking,
+      message: `Đã xác nhận nhận tiền ${booking.additionalPayment.amount.toLocaleString()}đ từ khách hàng. Booking hoàn tất.`,
+    });
+  } catch (error) {
+    console.error("Error confirming additional payment:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Get staff dashboard stats
 // @route   GET /api/staff/stats
 // @access  Private/Staff

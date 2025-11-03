@@ -554,29 +554,38 @@ const ProcessPaymentPage = () => {
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 text-sm">Chờ khách trả thêm</p>
-                  <p className="text-2xl font-bold text-orange-600">
+                  <p className="text-gray-600 text-sm">Khách đã thanh toán</p>
+                  <p className="text-2xl font-bold text-emerald-600">
                     {bookings.filter(b => {
                       if (b.status !== "refund_pending") return false;
                       const deposit = b.pricing?.deposit || 0;
                       const additionalCharges = b.pricing?.additionalCharges?.reduce((sum, c) => sum + c.amount, 0) || 0;
-                      return additionalCharges > deposit;
+                      const requiresPayment = additionalCharges > deposit;
+                      const customerPaid = b.additionalPayment?.status === "paid" || b.additionalPayment?.status === "completed";
+                      return requiresPayment && customerPaid;
                     }).length}
                   </p>
                 </div>
-                <CheckCircle className="w-8 h-8 text-orange-600" />
+                <CheckCircle className="w-8 h-8 text-emerald-600" />
               </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 text-sm">Tổng booking</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {bookings.length}
+                  <p className="text-gray-600 text-sm">Chờ khách trả thêm</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {bookings.filter(b => {
+                      if (b.status !== "refund_pending") return false;
+                      const deposit = b.pricing?.deposit || 0;
+                      const additionalCharges = b.pricing?.additionalCharges?.reduce((sum, c) => sum + c.amount, 0) || 0;
+                      const requiresPayment = additionalCharges > deposit;
+                      const customerPaid = b.additionalPayment?.status === "paid" || b.additionalPayment?.status === "completed";
+                      return requiresPayment && !customerPaid;
+                    }).length}
                   </p>
                 </div>
-                <FileText className="w-8 h-8 text-gray-600" />
+                <FileText className="w-8 h-8 text-orange-600" />
               </div>
             </div>
           </div>
@@ -611,15 +620,25 @@ const ProcessPaymentPage = () => {
                   const requiresCustomerPayment = additionalCharges > deposit;
                   const refundAmount = b.depositRefund?.amount || 0;
                   
+                  // Check if customer already paid additional charges via VNPAY
+                  const customerPaidAdditional = b.additionalPayment?.status === "paid" || b.additionalPayment?.status === "completed";
+                  
                   // Determine status badge and action
                   let statusBadge, statusText, actionType;
                   
                   if (isRefundCase) {
                     if (requiresCustomerPayment) {
-                      // Case: Additional charges > deposit, waiting for customer to pay via VNPAY
-                      statusBadge = "bg-orange-100 text-orange-800";
-                      statusText = "⏳ Chờ khách thanh toán bổ sung";
-                      actionType = "waiting";
+                      if (customerPaidAdditional) {
+                        // Case: Customer already paid via VNPAY, staff needs to confirm
+                        statusBadge = "bg-emerald-100 text-emerald-800";
+                        statusText = "✅ Khách đã thanh toán - Cần xác nhận";
+                        actionType = "confirm";
+                      } else {
+                        // Case: Additional charges > deposit, waiting for customer to pay via VNPAY
+                        statusBadge = "bg-orange-100 text-orange-800";
+                        statusText = "⏳ Chờ khách thanh toán bổ sung";
+                        actionType = "waiting";
+                      }
                     } else {
                       // Case: Additional charges <= deposit, staff needs to refund
                       statusBadge = "bg-yellow-100 text-yellow-800";
@@ -649,6 +668,32 @@ const ProcessPaymentPage = () => {
                           return;
                         }
                         
+                        if (actionType === "confirm") {
+                          // Show confirmation modal for customer payment
+                          const confirmed = window.confirm(
+                            `Khách hàng đã thanh toán ${b.additionalPayment.amount?.toLocaleString()}đ qua VNPAY.\n\n` +
+                            `Mã giao dịch: ${b.additionalPayment.transactionId}\n` +
+                            `Thời gian: ${new Date(b.additionalPayment.paidAt).toLocaleString("vi-VN")}\n\n` +
+                            `Xác nhận bạn đã kiểm tra và nhận được thanh toán này?\n` +
+                            `Booking sẽ được chuyển sang trạng thái hoàn tất.`
+                          );
+                          
+                          if (!confirmed) return;
+                          
+                          try {
+                            setLoading(true);
+                            await staffService.confirmAdditionalPaymentReceived(b._id);
+                            toast.success("Đã xác nhận thanh toán! Booking hoàn tất.");
+                            fetchPaymentPendingBookings(); // Refresh list
+                          } catch (error) {
+                            console.error("Error confirming payment:", error);
+                            toast.error(error.response?.data?.message || "Không thể xác nhận thanh toán");
+                          } finally {
+                            setLoading(false);
+                          }
+                          return;
+                        }
+                        
                         try {
                           setLoading(true);
                           setBooking(b);
@@ -671,6 +716,8 @@ const ProcessPaymentPage = () => {
                       className={`p-6 transition-colors ${
                         actionType === "waiting" 
                           ? "bg-orange-50 cursor-not-allowed opacity-75" 
+                          : actionType === "confirm"
+                          ? "bg-emerald-50 hover:bg-emerald-100 cursor-pointer border-2 border-emerald-300"
                           : "hover:bg-gray-50 cursor-pointer"
                       }`}
                     >
@@ -722,10 +769,36 @@ const ProcessPaymentPage = () => {
                                   <span className="ml-1 font-semibold text-red-600">{additionalCharges.toLocaleString()}đ</span>
                                 </div>
                               </div>
-                              {requiresCustomerPayment && (
+                              {requiresCustomerPayment && !customerPaidAdditional && (
                                 <p className="text-xs text-orange-700 mt-2 font-medium">
                                   🔔 Khách cần thanh toán thêm {(additionalCharges - deposit).toLocaleString()}đ qua VNPAY
                                 </p>
+                              )}
+                              {customerPaidAdditional && (
+                                <div className="mt-2 bg-emerald-100 border border-emerald-300 rounded p-2">
+                                  <p className="text-xs text-emerald-900 font-semibold mb-1">
+                                    💳 Thông tin thanh toán VNPAY:
+                                  </p>
+                                  <div className="grid grid-cols-2 gap-1 text-xs text-emerald-800">
+                                    <div>
+                                      <span className="text-emerald-700">Số tiền:</span>
+                                      <span className="ml-1 font-bold">{b.additionalPayment.amount?.toLocaleString()}đ</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-emerald-700">Thời gian:</span>
+                                      <span className="ml-1 font-semibold">
+                                        {new Date(b.additionalPayment.paidAt).toLocaleString("vi-VN")}
+                                      </span>
+                                    </div>
+                                    <div className="col-span-2">
+                                      <span className="text-emerald-700">Mã GD:</span>
+                                      <span className="ml-1 font-mono font-bold">{b.additionalPayment.transactionId}</span>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-emerald-700 mt-1 font-medium">
+                                    👉 Click để xác nhận đã nhận được thanh toán
+                                  </p>
+                                </div>
                               )}
                             </div>
                           )}
@@ -734,12 +807,21 @@ const ProcessPaymentPage = () => {
                         <div className="ml-4 text-right">
                           {isRefundCase ? (
                             requiresCustomerPayment ? (
-                              <>
-                                <p className="text-sm text-orange-600 mb-1">Cần thanh toán thêm</p>
-                                <p className="text-2xl font-bold text-red-600">
-                                  +{(additionalCharges - deposit).toLocaleString()}đ
-                                </p>
-                              </>
+                              customerPaidAdditional ? (
+                                <>
+                                  <p className="text-sm text-emerald-600 mb-1">✅ Đã thanh toán</p>
+                                  <p className="text-2xl font-bold text-emerald-600">
+                                    {b.additionalPayment.amount?.toLocaleString()}đ
+                                  </p>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-sm text-orange-600 mb-1">Cần thanh toán thêm</p>
+                                  <p className="text-2xl font-bold text-red-600">
+                                    +{(additionalCharges - deposit).toLocaleString()}đ
+                                  </p>
+                                </>
+                              )
                             ) : (
                               <>
                                 <p className="text-sm text-gray-600 mb-1">Hoàn lại</p>

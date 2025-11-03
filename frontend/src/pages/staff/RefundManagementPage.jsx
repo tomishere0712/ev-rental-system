@@ -60,6 +60,25 @@ const RefundManagementPage = () => {
     setSelectedBooking(booking);
     setShowRefundModal(true);
   };
+  
+  const handleConfirmAdditionalPayment = async (bookingId) => {
+    try {
+      const confirmed = window.confirm(
+        "Xác nhận bạn đã nhận tiền thanh toán chi phí phát sinh từ khách hàng?\n\n" +
+        "Booking sẽ được chuyển sang trạng thái hoàn tất."
+      );
+      
+      if (!confirmed) return;
+      
+      // Call API to confirm additional payment received
+      await staffService.confirmAdditionalPaymentReceived(bookingId);
+      toast.success("Đã xác nhận nhận tiền! Booking hoàn tất.");
+      fetchRefundPendingBookings();
+    } catch (error) {
+      console.error("Error confirming payment:", error);
+      toast.error(error.response?.data?.message || "Không thể xác nhận");
+    }
+  };
 
   const handleRefundSuccess = () => {
     setShowRefundModal(false);
@@ -208,12 +227,48 @@ const RefundManagementPage = () => {
             {bookings.map((booking) => {
               const refundStatus = getRefundStatusBadge(booking.depositRefund?.status);
               const StatusIcon = refundStatus.icon;
-              const canProcessRefund = booking.depositRefund?.status === "pending";
+              
+              // Check if this is additional payment case (charges > deposit)
+              const hasAdditionalPayment = booking.additionalPayment && booking.additionalPayment.amount > 0;
+              const additionalPaymentCompleted = hasAdditionalPayment && (booking.additionalPayment.status === "paid" || booking.additionalPayment.status === "completed");
+              
+              // Determine what action is available
+              let canProcessRefund = false;
+              let canConfirmPayment = false;
+              let actionButton = null;
+              
+              if (additionalPaymentCompleted) {
+                // Case: Customer paid additional charges, staff needs to confirm receipt
+                canConfirmPayment = true;
+                actionButton = (
+                  <button
+                    onClick={() => handleConfirmAdditionalPayment(booking._id)}
+                    className="ml-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Check className="w-5 h-5" />
+                    Xác nhận đã nhận tiền
+                  </button>
+                );
+              } else if (booking.depositRefund?.status === "pending" && !hasAdditionalPayment) {
+                // Case: Normal refund (charges <= deposit)
+                canProcessRefund = true;
+                actionButton = (
+                  <button
+                    onClick={() => handleProcessRefund(booking)}
+                    className="ml-4 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <DollarSign className="w-5 h-5" />
+                    Xử lý hoàn tiền
+                  </button>
+                );
+              }
 
               return (
                 <div
                   key={booking._id}
-                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                  className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow ${
+                    additionalPaymentCompleted ? 'border-2 border-blue-300' : ''
+                  }`}
                 >
                   <div className="p-6">
                     {/* Header Row */}
@@ -223,10 +278,17 @@ const RefundManagementPage = () => {
                           <h3 className="text-xl font-bold text-gray-900">
                             {booking.bookingCode}
                           </h3>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${refundStatus.bg} ${refundStatus.text} flex items-center gap-1`}>
-                            <StatusIcon className="w-3 h-3" />
-                            {refundStatus.label}
-                          </span>
+                          {additionalPaymentCompleted ? (
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              ✅ Khách đã thanh toán - Chờ xác nhận
+                            </span>
+                          ) : (
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${refundStatus.bg} ${refundStatus.text} flex items-center gap-1`}>
+                              <StatusIcon className="w-3 h-3" />
+                              {refundStatus.label}
+                            </span>
+                          )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -258,15 +320,7 @@ const RefundManagementPage = () => {
                       </div>
 
                       {/* Action Button */}
-                      {canProcessRefund && (
-                        <button
-                          onClick={() => handleProcessRefund(booking)}
-                          className="ml-4 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center gap-2 whitespace-nowrap"
-                        >
-                          <DollarSign className="w-5 h-5" />
-                          Xử lý hoàn tiền
-                        </button>
-                      )}
+                      {actionButton}
                     </div>
 
                     {/* Refund Details */}
@@ -283,20 +337,67 @@ const RefundManagementPage = () => {
                           <div>
                             <p className="text-xs text-gray-600 mb-1">Chi phí phát sinh</p>
                             <p className="text-lg font-bold text-red-600">
-                              -{booking.pricing.additionalCharges.reduce((sum, c) => sum + c.amount, 0).toLocaleString()}đ
+                              {booking.pricing.additionalCharges.reduce((sum, c) => sum + c.amount, 0).toLocaleString()}đ
                             </p>
                           </div>
                         )}
 
-                        <div>
-                          <p className="text-xs text-gray-600 mb-1">Số tiền hoàn lại</p>
-                          <p className="text-lg font-bold text-green-600">
-                            {booking.depositRefund?.amount?.toLocaleString() || "0"}đ
-                          </p>
-                        </div>
+                        {hasAdditionalPayment ? (
+                          <div>
+                            <p className="text-xs text-gray-600 mb-1">
+                              {additionalPaymentCompleted ? "✅ Khách đã trả thêm" : "⏳ Cần trả thêm"}
+                            </p>
+                            <p className={`text-lg font-bold ${additionalPaymentCompleted ? 'text-green-600' : 'text-orange-600'}`}>
+                              +{booking.additionalPayment.amount?.toLocaleString()}đ
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-xs text-gray-600 mb-1">Số tiền hoàn lại</p>
+                            <p className="text-lg font-bold text-green-600">
+                              {booking.depositRefund?.amount?.toLocaleString() || "0"}đ
+                            </p>
+                          </div>
+                        )}
                       </div>
 
-                      {booking.depositRefund?.notes && (
+                      {additionalPaymentCompleted && (
+                        <div className="mt-3 pt-3 border-t border-blue-200 bg-blue-50 -mx-4 -mb-4 p-4 rounded-b-lg">
+                          <p className="text-sm text-blue-900 font-semibold mb-2">
+                            💳 Thông tin thanh toán của khách:
+                          </p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-blue-700">Số tiền:</span>
+                              <span className="ml-2 font-bold text-blue-900">
+                                {booking.additionalPayment.amount?.toLocaleString()}đ
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-blue-700">Phương thức:</span>
+                              <span className="ml-2 font-bold text-blue-900">VNPAY</span>
+                            </div>
+                            {booking.additionalPayment.transactionId && (
+                              <div className="col-span-2">
+                                <span className="text-blue-700">Mã GD:</span>
+                                <span className="ml-2 font-mono font-bold text-blue-900">
+                                  {booking.additionalPayment.transactionId}
+                                </span>
+                              </div>
+                            )}
+                            {booking.additionalPayment.paidAt && (
+                              <div className="col-span-2">
+                                <span className="text-blue-700">Thời gian:</span>
+                                <span className="ml-2 font-bold text-blue-900">
+                                  {new Date(booking.additionalPayment.paidAt).toLocaleString("vi-VN")}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {booking.depositRefund?.notes && !hasAdditionalPayment && (
                         <div className="mt-3 pt-3 border-t border-gray-200">
                           <p className="text-xs text-gray-600 mb-1">📝 Ghi chú:</p>
                           <p className="text-sm text-gray-700">{booking.depositRefund.notes}</p>

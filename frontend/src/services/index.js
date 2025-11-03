@@ -289,6 +289,12 @@ export const staffService = {
     );
     return response.data;
   },
+  
+  // Confirm additional payment received
+  confirmAdditionalPaymentReceived: async (bookingId) => {
+    const response = await api.post(`/staff/bookings/${bookingId}/confirm-additional-payment`);
+    return response.data;
+  },
 };
 
 // Admin Services
