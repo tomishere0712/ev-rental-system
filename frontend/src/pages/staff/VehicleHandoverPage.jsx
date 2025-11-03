@@ -314,7 +314,7 @@ const VehicleHandoverPage = () => {
             </button>
           </div>
           <p className="text-sm text-gray-500">
-            💡 Mẹo: Bạn có thể chỉ nhập số (VD: "17621024931020008") và hệ thống sẽ tự động thêm "BK"
+            💡 Mẹo: Bạn có thể chỉ nhập số (VD: &quot;17621024931020008&quot;) và hệ thống sẽ tự động thêm &quot;BK&quot;
           </p>
         </form>
 

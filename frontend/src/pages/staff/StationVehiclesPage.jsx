@@ -19,7 +19,7 @@ const StationVehiclesPage = () => {
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [currentBatteryLevel, setCurrentBatteryLevel] = useState("");
   const [issueDescription, setIssueDescription] = useState("");
-  const [issueSeverity, setIssueSeverity] = useState("minor");
+  const [issueSeverity, setIssueSeverity] = useState("low");
   const [submitting, setSubmitting] = useState(false);
   const [station, setStation] = useState(null);
 
@@ -62,7 +62,7 @@ const StationVehiclesPage = () => {
 
   const fetchVehicles = async () => {
     if (!station) return;
-    
+
     try {
       setLoading(true);
       const params = {
@@ -126,6 +126,7 @@ const StationVehiclesPage = () => {
       setSelectedVehicle(null);
       fetchVehicles();
     } catch (error) {
+      console.error("❌ Lỗi gửi báo cáo sự cố:", error.response || error);
       toast.error(error.response?.data?.message || "Không thể gửi báo cáo sự cố");
     } finally {
       setSubmitting(false);
@@ -138,9 +139,8 @@ const StationVehiclesPage = () => {
 
     try {
       await staffService.updateVehicleStatus(vehicle._id, newStatus);
-      toast.success(`Đã cập nhật trạng thái phương tiện thành ${
-        newStatus === "available" ? "sẵn sàng" : "không khả dụng"
-      }`, {
+      toast.success(`Đã cập nhật trạng thái phương tiện thành ${newStatus === "available" ? "sẵn sàng" : "không khả dụng"
+        }`, {
         icon: newStatus === "available" ? '✅' : '❌',
       });
       fetchVehicles();
@@ -176,7 +176,7 @@ const StationVehiclesPage = () => {
 
   return (
     <div className="p-6">
-      <Toaster 
+      <Toaster
         position="top-right"
         toastOptions={{
           duration: 3000,
@@ -207,25 +207,24 @@ const StationVehiclesPage = () => {
           {["all", "available", "rented", "maintenance", "unavailable"].map(
             (tab) => {
               // Tính toán số lượng xe cho mỗi trạng thái dựa trên tất cả xe
-              const count = tab === "all" 
-                ? allVehicles.length 
+              const count = tab === "all"
+                ? allVehicles.length
                 : allVehicles.filter(v => v.status === tab).length;
-              
+
               return (
                 <button
                   key={tab}
                   onClick={() => setFilter(tab)}
-                  className={`px-6 py-3 font-medium capitalize whitespace-nowrap ${
-                    filter === tab
+                  className={`px-6 py-3 font-medium capitalize whitespace-nowrap ${filter === tab
                       ? "border-b-2 border-blue-600 text-blue-600"
                       : "text-gray-600 hover:text-gray-900"
-                  }`}
+                    }`}
                 >
-                  {tab === "all" ? "Tất cả" : 
-                   tab === "available" ? "Sẵn sàng" :
-                   tab === "rented" ? "Đang thuê" :
-                   tab === "maintenance" ? "Bảo trì" :
-                   "Không khả dụng"} ({count})
+                  {tab === "all" ? "Tất cả" :
+                    tab === "available" ? "Sẵn sàng" :
+                      tab === "rented" ? "Đang thuê" :
+                        tab === "maintenance" ? "Bảo trì" :
+                          "Không khả dụng"} ({count})
                 </button>
               );
             }
@@ -260,10 +259,10 @@ const StationVehiclesPage = () => {
                   )}`}
                 >
                   {vehicle.status === "available" ? "Sẵn sàng" :
-                   vehicle.status === "rented" ? "Đang thuê" :
-                   vehicle.status === "maintenance" ? "Bảo trì" :
-                   vehicle.status === "unavailable" ? "Không khả dụng" :
-                   vehicle.status}
+                    vehicle.status === "rented" ? "Đang thuê" :
+                      vehicle.status === "maintenance" ? "Bảo trì" :
+                        vehicle.status === "unavailable" ? "Không khả dụng" :
+                          vehicle.status}
                 </span>
               </div>
             </div>
@@ -341,13 +340,12 @@ const StationVehiclesPage = () => {
                 <button
                   onClick={() => handleStatusToggle(vehicle)}
                   disabled={vehicle.status === "rented"}
-                  className={`w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${
-                    vehicle.status === "available"
+                  className={`w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${vehicle.status === "available"
                       ? "bg-red-600 hover:bg-red-700 text-white"
                       : vehicle.status === "rented"
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-green-600 hover:bg-green-700 text-white"
-                  }`}
+                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        : "bg-green-600 hover:bg-green-700 text-white"
+                    }`}
                 >
                   {vehicle.status === "available" ? (
                     <>
@@ -449,9 +447,9 @@ const StationVehiclesPage = () => {
                 onChange={(e) => setIssueSeverity(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="minor">Nhẹ</option>
-                <option value="moderate">Trung bình</option>
-                <option value="severe">Nghiêm trọng</option>
+                <option value="low">Nhẹ</option>
+                <option value="medium">Trung bình</option>
+                <option value="high">Nghiêm trọng</option>
               </select>
             </div>
             <div className="flex gap-3">

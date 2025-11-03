@@ -299,6 +299,9 @@ const ManageVehiclesPage = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Actions
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Issues
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -385,6 +388,29 @@ const ManageVehiclesPage = () => {
                       </button>
                     </div>
                   </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {vehicle.currentIssues && vehicle.currentIssues.length > 0 ? (
+                      <ul className="space-y-1">
+                        {vehicle.currentIssues.map((issue, idx) => (
+                          <li key={idx} className="flex items-center gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs font-semibold ${issue.severity === "low"
+                                  ? "bg-green-100 text-green-800"
+                                  : issue.severity === "medium"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                            >
+                              {issue.severity}
+                            </span>
+                            <span>{issue.description}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-gray-400">No issues</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -408,11 +434,10 @@ const ManageVehiclesPage = () => {
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-2 rounded-lg ${
-                        page === currentPage
-                          ? "bg-blue-600 text-white"
-                          : "border border-gray-300 hover:bg-gray-50"
-                      }`}
+                      className={`px-3 py-2 rounded-lg ${page === currentPage
+                        ? "bg-blue-600 text-white"
+                        : "border border-gray-300 hover:bg-gray-50"
+                        }`}
                     >
                       {page}
                     </button>

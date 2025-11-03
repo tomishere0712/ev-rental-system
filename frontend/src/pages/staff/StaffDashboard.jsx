@@ -4,7 +4,7 @@ import {
   Users,
   Car,
   Clock,
-  Calendar,
+
   CheckCircle,
   AlertCircle,
   TrendingUp,
@@ -29,7 +29,7 @@ const StaffDashboard = () => {
     try {
       setLoading(true);
       console.log("🔄 Fetching staff dashboard data...");
-      
+
       const [statsResponse, bookingsResponse] = await Promise.all([
         staffService.getStats(),
         staffService.getBookings({ status: "pending,confirmed,in-progress,pending_return,refund_pending,completed" }),
@@ -39,7 +39,7 @@ const StaffDashboard = () => {
       console.log("📋 Bookings response:", bookingsResponse);
       console.log("📋 Bookings data:", bookingsResponse.data);
       console.log("📋 Bookings count:", bookingsResponse.data?.length || 0);
-      
+
       if (bookingsResponse.data && bookingsResponse.data.length > 0) {
         console.log("📋 Booking statuses:", bookingsResponse.data.map(b => ({
           number: b.bookingNumber,
@@ -48,7 +48,7 @@ const StaffDashboard = () => {
           depositRefund: b.depositRefund,
           renter: b.renter?.fullName || b.renter?.email
         })));
-        
+
         // Debug: Log bookings in refund_pending status
         const refundPendingBookings = bookingsResponse.data.filter(b => b.status === "refund_pending");
         console.log("🔍 Bookings with refund_pending status:", refundPendingBookings.length);
@@ -61,10 +61,10 @@ const StaffDashboard = () => {
             depositRefundAmount: b.depositRefund?.amount
           });
         });
-        
+
         // Debug: Log bookings with paid additional payment
-        const paidAdditionalBookings = bookingsResponse.data.filter(b => 
-          b.status === "refund_pending" && 
+        const paidAdditionalBookings = bookingsResponse.data.filter(b =>
+          b.status === "refund_pending" &&
           (b.additionalPayment?.status === "paid" || b.additionalPayment?.status === "completed")
         );
         console.log("💳 Bookings with PAID additional payment:", paidAdditionalBookings.length);
@@ -92,14 +92,14 @@ const StaffDashboard = () => {
 
   const handleConfirmBooking = async () => {
     if (!confirmModal.booking) return;
-    
+
     setConfirming(true);
     try {
       await staffService.verifyCustomer(confirmModal.booking._id, {
         approved: true,
         notes: "Đã xác nhận booking"
       });
-      
+
       toast.success("Đã xác nhận booking thành công!");
       setConfirmModal({ show: false, booking: null });
       fetchDashboardData(); // Refresh data
@@ -120,7 +120,7 @@ const StaffDashboard = () => {
       confirmed: { label: "Đã xác thực", color: "bg-blue-100 text-blue-800" },
       "in-progress": { label: "Đang thuê", color: "bg-green-100 text-green-800" },
       "pending_return": { label: "Chờ trả xe", color: "bg-orange-100 text-orange-800" },
-      "refund_pending": { 
+      "refund_pending": {
         label: (() => {
           // Check if customer paid additional charges
           if (booking?.additionalPayment?.status === "paid" || booking?.additionalPayment?.status === "completed") {
@@ -217,9 +217,8 @@ const StaffDashboard = () => {
         />
         <StatCard
           title="Xe khả dụng"
-          value={`${stats?.availableVehicles || 0} / ${
-            stats?.stationVehicles || 0
-          }`}
+          value={`${stats?.availableVehicles || 0} / ${stats?.stationVehicles || 0
+            }`}
           icon={Car}
           color="purple"
           subtitle="Tổng số xe"
@@ -291,8 +290,8 @@ const StaffDashboard = () => {
               <h3 className="font-semibold text-emerald-900">✅ Khách đã thanh toán</h3>
               <span className="text-2xl font-bold text-emerald-600">
                 {(() => {
-                  const count = bookings.filter(b => 
-                    b.status === "refund_pending" && 
+                  const count = bookings.filter(b =>
+                    b.status === "refund_pending" &&
                     (b.additionalPayment?.status === "paid" || b.additionalPayment?.status === "completed")
                   ).length;
                   console.log(`📊 Card "Khách đã thanh toán" count: ${count}`);
@@ -301,8 +300,8 @@ const StaffDashboard = () => {
               </span>
             </div>
             <p className="text-sm text-emerald-700">Cần xác nhận đã nhận tiền</p>
-            <Link 
-              to="/staff/payment" 
+            <Link
+              to="/staff/payment"
               className="mt-3 inline-block text-sm font-medium text-emerald-600 hover:text-emerald-700"
             >
               Xử lý ngay →
@@ -341,8 +340,8 @@ const StaffDashboard = () => {
               </span>
             </div>
             <p className="text-sm text-purple-700">Staff cần chuyển tiền hoàn cọc</p>
-            <Link 
-              to="/staff/refund" 
+            <Link
+              to="/staff/refund"
               className="mt-3 inline-block text-sm font-medium text-purple-600 hover:text-purple-700"
             >
               Xử lý ngay →
@@ -399,7 +398,7 @@ const StaffDashboard = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {booking.userId?.fullName || "N/A"}
+                        {booking.renter?.fullName || "N/A"}
                       </div>
                       <div className="text-sm text-gray-500">
                         {booking.userId?.phone}
@@ -416,7 +415,7 @@ const StaffDashboard = () => {
                         )}
                         <div className="text-sm">
                           <div className="font-medium text-gray-900">
-                            {booking.vehicleId?.name || "N/A"}
+                            {booking.vehicle?.name || "N/A"}
                           </div>
                           <div className="text-gray-500">
                             {booking.vehicleId?.licensePlate}
@@ -468,11 +467,11 @@ const StaffDashboard = () => {
                           to="/staff/refund"
                           className="text-purple-600 hover:text-purple-700 font-medium"
                         >
-                          {booking.additionalPayment?.status === "paid" || booking.additionalPayment?.status === "completed" 
+                          {booking.additionalPayment?.status === "paid" || booking.additionalPayment?.status === "completed"
                             ? "Xác nhận đã nhận tiền"
                             : booking.additionalPayment?.status === "pending"
-                            ? "Chờ khách thanh toán"
-                            : "Xử lý hoàn cọc"
+                              ? "Chờ khách thanh toán"
+                              : "Xử lý hoàn cọc"
                           }
                         </Link>
                       )}
@@ -492,12 +491,12 @@ const StaffDashboard = () => {
             <h3 className="text-xl font-bold text-gray-900 mb-4">
               Xác nhận Booking
             </h3>
-            
+
             <div className="mb-6 space-y-3">
               <p className="text-gray-700">
                 Bạn có chắc muốn xác nhận booking này?
               </p>
-              
+
               <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Mã booking:</span>
@@ -520,8 +519,9 @@ const StaffDashboard = () => {
               </div>
 
               <p className="text-sm text-gray-600">
-                Sau khi xác nhận, booking sẽ chuyển sang trạng thái <span className="font-semibold text-blue-600">"Đã xác nhận"</span> và sẵn sàng để giao xe.
+                Sau khi xác nhận, booking sẽ chuyển sang trạng thái <span className="font-semibold text-blue-600">&quot;Đã xác nhận&quot;</span> và sẵn sàng để giao xe.
               </p>
+
             </div>
 
             <div className="flex gap-3">

@@ -242,10 +242,11 @@ export const staffService = {
     return response.data;
   },
 
-  reportIssue: async (id, data) => {
-    const response = await api.post(`/staff/vehicles/${id}/issue`, data);
-    return response.data;
-  },
+ reportVehicleIssue: async (id, data) => {
+  const response = await api.post(`/staff/vehicles/${id}/issue`, data);
+  return response.data;
+},
+
 
   updateVehicleStatus: async (id, status) => {
     const response = await api.put(`/staff/vehicles/${id}/status`, { status });

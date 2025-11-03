@@ -722,35 +722,35 @@ exports.updateVehicleBattery = async (req, res) => {
 // @access  Private/Staff
 exports.reportVehicleIssue = async (req, res) => {
   try {
+    const vehicleId = req.params.id;
     const { description, severity } = req.body;
 
-    const vehicle = await Vehicle.findById(req.params.id);
+    if (!description || !severity) {
+      return res.status(400).json({ message: "Vui lòng cung cấp mô tả và mức độ nghiêm trọng" });
+    }
 
+    // Kiểm tra severity hợp lệ
+    if (!["low", "medium", "high"].includes(severity)) {
+      return res.status(400).json({ message: "Mức độ nghiêm trọng không hợp lệ" });
+    }
+
+    const vehicle = await Vehicle.findById(vehicleId);
     if (!vehicle) {
-      return res.status(404).json({ message: "Không tìm thấy xe" });
+      return res.status(404).json({ message: "Xe không tồn tại" });
     }
 
     vehicle.currentIssues.push({
       description,
-      severity: severity || "medium",
-      reportedBy: req.user.id,
-      reportedAt: Date.now(),
+      severity,
+      reportedBy: req.user._id,
     });
-
-    // If high severity, mark as maintenance
-    if (severity === "high") {
-      vehicle.status = "maintenance";
-    }
 
     await vehicle.save();
 
-    res.json({
-      success: true,
-      data: vehicle,
-      message: "Đã báo cáo sự cố",
-    });
+    res.json({ success: true, message: "Báo cáo sự cố thành công", data: vehicle });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("❌ Lỗi reportVehicleIssue:", error);
+    res.status(500).json({ message: "Không thể gửi báo cáo sự cố", error: error.message });
   }
 };
 
