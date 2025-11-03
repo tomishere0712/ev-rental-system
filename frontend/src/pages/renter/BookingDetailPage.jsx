@@ -206,7 +206,43 @@ const BookingDetailPage = () => {
         </div>
       </div>
 
-      {/* Refund Confirmation Banner */}
+      {/* Refund Pending Banner - Waiting for staff to transfer money */}
+      {booking.status === "refund_pending" && 
+       booking.depositRefund && 
+       booking.depositRefund.status === "pending" &&
+       booking.depositRefund.amount > 0 && (
+        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-lg p-6 mb-6 shadow-lg">
+          <div className="flex items-start gap-4">
+            <div className="bg-yellow-500 p-3 rounded-full animate-pulse">
+              <Clock className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-yellow-900 mb-2">
+                ⏳ Chờ staff hoàn tiền cọc
+              </h3>
+              <p className="text-yellow-800 mb-3">
+                Staff đang xử lý hoàn tiền{" "}
+                <span className="font-bold text-lg text-green-600">
+                  {booking.depositRefund.amount.toLocaleString()}đ
+                </span>{" "}
+                về tài khoản của bạn
+              </p>
+              {booking.depositRefund.notes && (
+                <div className="bg-white rounded-lg p-4 mb-4">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold">📝 Ghi chú:</span> {booking.depositRefund.notes}
+                  </p>
+                </div>
+              )}
+              <p className="text-sm text-yellow-700">
+                💡 Bạn sẽ nhận được thông báo khi staff chuyển tiền xong. Sau đó bạn cần xác nhận đã nhận tiền để hoàn tất đơn.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Refund Confirmation Banner - Staff has transferred, waiting for renter confirmation */}
       {booking.status === "refund_pending" && 
        booking.depositRefund && 
        booking.depositRefund.status === "refunded" &&
@@ -266,7 +302,8 @@ const BookingDetailPage = () => {
       {/* Additional Payment Required Banner */}
       {(booking.status === "pending_return" || booking.status === "refund_pending") && 
        booking.additionalPayment && 
-       booking.additionalPayment.status === "pending" && (
+       booking.additionalPayment.status === "pending" &&
+       booking.additionalPayment.amount && (
         <div className="bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-300 rounded-lg p-6 mb-6 shadow-lg">
           <div className="flex items-start gap-4">
             <div className="bg-orange-600 p-3 rounded-full">
@@ -610,38 +647,48 @@ const BookingDetailPage = () => {
               console.log("🔍 Has depositRefund?", !!booking.depositRefund);
               return null;
             })()}
-            {booking.depositRefund && booking.depositRefund.status !== 'pending_payment' && (
+            {/* Show deposit refund - 0đ if pending_return, actual amount after staff processes */}
+            {(booking.depositRefund && booking.depositRefund.status !== 'pending_payment') || 
+             booking.status === 'pending_return' ? (
               <div className={`border-t border-gray-200 pt-3 ${
-                booking.depositRefund.status === 'not_applicable' ? 'bg-orange-50 -mx-6 -mb-6 p-6 mt-3 rounded-b-lg border-2 border-orange-200' : ''
+                booking.depositRefund?.status === 'not_applicable' ? 'bg-orange-50 -mx-6 -mb-6 p-6 mt-3 rounded-b-lg border-2 border-orange-200' : ''
               }`}>
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <span className={`font-semibold ${
-                      booking.depositRefund.amount === 0 ? 'text-orange-900' : 'text-gray-900'
+                      booking.depositRefund?.amount === 0 ? 'text-orange-900' : 'text-gray-900'
                     }`}>
-                      {booking.depositRefund.amount === 0 ? '⚠️ Không hoàn tiền cọc' : 'Hoàn tiền cọc'}
+                      {booking.depositRefund?.amount === 0 ? '⚠️ Không hoàn tiền cọc' : 'Hoàn tiền cọc'}
                     </span>
-                    {booking.depositRefund.notes && (
+                    {booking.depositRefund?.notes && (
                       <p className={`text-xs mt-1 ${
                         booking.depositRefund.amount === 0 ? 'text-orange-700' : 'text-gray-600'
                       }`}>
                         {booking.depositRefund.notes}
                       </p>
                     )}
-                    {booking.depositRefund.amount === 0 && booking.depositRefund.status === 'not_applicable' && (
+                    {booking.status === 'pending_return' && !booking.depositRefund && (
+                      <p className="text-xs text-gray-600 mt-1">
+                        💡 Chờ staff kiểm tra xe và tính toán chi phí phát sinh
+                      </p>
+                    )}
+                    {booking.depositRefund?.amount === 0 && booking.depositRefund?.status === 'not_applicable' && (
                       <p className="text-xs text-orange-600 mt-2 font-semibold">
                         💡 Chi phí phát sinh đã vượt số tiền cọc. Bạn đã thanh toán đủ chi phí bổ sung.
                       </p>
                     )}
                   </div>
                   <span className={`text-lg font-bold ${
-                    booking.depositRefund.amount === 0 ? 'text-orange-600' : 'text-blue-600'
+                    booking.depositRefund?.amount === 0 ? 'text-orange-600' : 'text-blue-600'
                   }`}>
-                    {booking.depositRefund.amount?.toLocaleString("vi-VN")}đ
+                    {booking.depositRefund?.amount !== undefined 
+                      ? booking.depositRefund.amount.toLocaleString("vi-VN")
+                      : '0'
+                    }đ
                   </span>
                 </div>
               </div>
-            )}
+            ) : null}
 
             <div className="border-t border-gray-200 pt-3">
               <div className="flex justify-between items-center">

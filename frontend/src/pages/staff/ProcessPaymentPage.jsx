@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { staffService } from "../../services";
 import {
   Search,
@@ -9,10 +9,13 @@ import {
   User,
   Car,
   CheckCircle,
+  ArrowLeft,
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 const ProcessPaymentPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [bookings, setBookings] = useState([]);
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -23,6 +26,30 @@ const ProcessPaymentPage = () => {
   const [paidAmount, setPaidAmount] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [paymentSummary, setPaymentSummary] = useState(null);
+
+  // Load bookings that need payment on mount
+  useEffect(() => {
+    fetchPaymentPendingBookings();
+  }, []);
+
+  const fetchPaymentPendingBookings = async () => {
+    try {
+      setLoading(true);
+      console.log("📋 Loading bookings that need payment...");
+      const response = await staffService.getBookings({ 
+        status: "confirmed,refund_pending" // Both rental payment and refund processing
+      });
+      
+      const bookingsList = response.data || response || [];
+      console.log("✅ Loaded", bookingsList.length, "bookings");
+      setBookings(bookingsList);
+    } catch (error) {
+      console.error("❌ Error loading bookings:", error);
+      toast.error("Không thể tải danh sách booking");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -126,6 +153,25 @@ const ProcessPaymentPage = () => {
 
       {/* Search Form */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Tìm kiếm booking</h2>
+          {booking && (
+            <button
+              onClick={() => {
+                setBooking(null);
+                setPaymentSummary(null);
+                setSearchQuery("");
+                setPaidAmount("");
+                setPaymentNotes("");
+                setError("");
+              }}
+              className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Quay lại danh sách
+            </button>
+          )}
+        </div>
         <form onSubmit={handleSearch} className="flex gap-4">
           <div className="flex-1">
             <input
@@ -240,74 +286,108 @@ const ProcessPaymentPage = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* Payment Summary */}
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
+              <div className={`px-6 py-4 ${paymentSummary.isRefund ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' : 'bg-gradient-to-r from-green-500 to-green-600'}`}>
                 <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                   <DollarSign className="w-6 h-6" />
-                  Payment Summary
+                  {paymentSummary.isRefund ? 'Thông tin hoàn tiền' : 'Payment Summary'}
                 </h2>
               </div>
 
               <div className="p-6 space-y-4">
-                {/* Cost Breakdown */}
-                <div className="space-y-3">
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-gray-600">Base Amount</span>
-                    <span className="font-semibold">
-                      $
-                      {paymentSummary.baseAmount?.toFixed(2) ||
-                        booking.totalAmount.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-gray-600">Deposit</span>
-                    <span className="font-semibold">
-                      ${booking.deposit.toFixed(2)}
-                    </span>
-                  </div>
-                  {paymentSummary.lateFees > 0 && (
-                    <div className="flex justify-between py-2 border-b text-orange-600">
-                      <span>Late Fees</span>
+                {paymentSummary.isRefund ? (
+                  /* Refund Case */
+                  <div className="space-y-3">
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-gray-600">Tiền cọc ban đầu</span>
                       <span className="font-semibold">
-                        +${paymentSummary.lateFees.toFixed(2)}
+                        {paymentSummary.deposit?.toLocaleString()}đ
                       </span>
                     </div>
-                  )}
-                  {paymentSummary.damageFees > 0 && (
-                    <div className="flex justify-between py-2 border-b text-red-600">
-                      <span>Damage Fees</span>
+                    {paymentSummary.additionalCharges > 0 && (
+                      <div className="flex justify-between py-2 border-b text-red-600">
+                        <span>Chi phí phát sinh</span>
+                        <span className="font-semibold">
+                          -{paymentSummary.additionalCharges?.toLocaleString()}đ
+                        </span>
+                      </div>
+                    )}
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold text-gray-900">
+                          Số tiền hoàn lại
+                        </span>
+                        <span className="text-3xl font-bold text-green-600">
+                          {paymentSummary.refundAmount?.toLocaleString()}đ
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-2">
+                        💡 Nhập thông tin chuyển khoản bên dưới
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  /* Normal Payment Case */
+                  <div className="space-y-3">
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-gray-600">Base Amount</span>
                       <span className="font-semibold">
-                        +${paymentSummary.damageFees.toFixed(2)}
+                        {paymentSummary.baseAmount?.toLocaleString() ||
+                          booking.pricing?.totalAmount?.toLocaleString()}đ
                       </span>
                     </div>
-                  )}
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-gray-600">Total Paid</span>
-                    <span className="font-semibold text-green-600">
-                      ${paymentSummary.totalPaid.toFixed(2)}
-                    </span>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-gray-600">Deposit</span>
+                      <span className="font-semibold">
+                        {booking.pricing?.deposit?.toLocaleString()}đ
+                      </span>
+                    </div>
+                    {paymentSummary.lateFees > 0 && (
+                      <div className="flex justify-between py-2 border-b text-orange-600">
+                        <span>Late Fees</span>
+                        <span className="font-semibold">
+                          +{paymentSummary.lateFees?.toLocaleString()}đ
+                        </span>
+                      </div>
+                    )}
+                    {paymentSummary.damageFees > 0 && (
+                      <div className="flex justify-between py-2 border-b text-red-600">
+                        <span>Damage Fees</span>
+                        <span className="font-semibold">
+                          +{paymentSummary.damageFees?.toLocaleString()}đ
+                        </span>
+                      </div>
+                    )}
+                    {paymentSummary.totalPaid > 0 && (
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-gray-600">Total Paid</span>
+                        <span className="font-semibold text-green-600">
+                          {paymentSummary.totalPaid?.toLocaleString()}đ
+                        </span>
+                      </div>
+                    )}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold text-gray-900">
+                          Amount Due
+                        </span>
+                        <span className="text-3xl font-bold text-blue-600">
+                          {paymentSummary.amountDue?.toLocaleString()}đ
+                        </span>
+                      </div>
+                      {paymentSummary.paymentStatus && (
+                        <div className="mt-2">
+                          <span
+                            className={`px-3 py-1 rounded-full text-sm font-semibold ${getPaymentStatusBadge(
+                              paymentSummary.paymentStatus
+                            )}`}
+                          >
+                            {paymentSummary.paymentStatus.toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-
-                {/* Total Amount Due */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-semibold text-gray-900">
-                      Amount Due
-                    </span>
-                    <span className="text-3xl font-bold text-blue-600">
-                      ${paymentSummary.amountDue.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="mt-2">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-semibold ${getPaymentStatusBadge(
-                        paymentSummary.paymentStatus
-                      )}`}
-                    >
-                      {paymentSummary.paymentStatus.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
+                )}
 
                 {/* Payment History */}
                 {paymentSummary.payments &&
@@ -328,12 +408,12 @@ const ProcessPaymentPage = () => {
                               </span>
                               <span className="text-xs text-gray-600 ml-2">
                                 {new Date(payment.createdAt).toLocaleDateString(
-                                  "en-GB"
+                                  "vi-VN"
                                 )}
                               </span>
                             </div>
                             <span className="text-sm font-semibold text-green-600">
-                              ${payment.amount.toFixed(2)}
+                              {payment.amount?.toLocaleString()}đ
                             </span>
                           </div>
                         ))}
@@ -349,7 +429,7 @@ const ProcessPaymentPage = () => {
                 <div className="flex items-center gap-2 mb-6">
                   <CreditCard className="w-5 h-5 text-gray-600" />
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Process New Payment
+                    {paymentSummary.isRefund ? 'Xử lý hoàn tiền' : 'Process New Payment'}
                   </h3>
                 </div>
 
@@ -437,13 +517,253 @@ const ProcessPaymentPage = () => {
         </div>
       )}
 
-      {/* Help Text */}
+      {/* Help Text or Bookings List */}
       {!booking && !error && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-          <p className="text-blue-800">
-            Search for a booking using the booking number or customer email to
-            process payment.
-          </p>
+        <div className="space-y-6">
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm">Chờ thu tiền</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {bookings.filter(b => b.status === "confirmed" && b.payment?.status !== "paid").length}
+                  </p>
+                </div>
+                <CreditCard className="w-8 h-8 text-blue-600" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm">Cần hoàn cọc</p>
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {bookings.filter(b => {
+                      if (b.status !== "refund_pending") return false;
+                      const deposit = b.pricing?.deposit || 0;
+                      const additionalCharges = b.pricing?.additionalCharges?.reduce((sum, c) => sum + c.amount, 0) || 0;
+                      return additionalCharges <= deposit;
+                    }).length}
+                  </p>
+                </div>
+                <DollarSign className="w-8 h-8 text-yellow-600" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm">Chờ khách trả thêm</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {bookings.filter(b => {
+                      if (b.status !== "refund_pending") return false;
+                      const deposit = b.pricing?.deposit || 0;
+                      const additionalCharges = b.pricing?.additionalCharges?.reduce((sum, c) => sum + c.amount, 0) || 0;
+                      return additionalCharges > deposit;
+                    }).length}
+                  </p>
+                </div>
+                <CheckCircle className="w-8 h-8 text-orange-600" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm">Tổng booking</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {bookings.length}
+                  </p>
+                </div>
+                <FileText className="w-8 h-8 text-gray-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Bookings List */}
+          {bookings.length === 0 ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-12 text-center">
+              <CreditCard className="w-16 h-16 text-blue-300 mx-auto mb-4" />
+              <p className="text-xl font-semibold text-blue-900 mb-2">
+                Không có booking nào cần thanh toán
+              </p>
+              <p className="text-blue-700">
+                Tất cả booking đã được thanh toán hoặc chưa có booking mới
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-md">
+              <div className="p-6 border-b">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Danh sách booking cần xử lý thanh toán
+                </h2>
+                <p className="text-gray-600 text-sm mt-1">
+                  Click vào booking để xem chi tiết và xử lý thanh toán
+                </p>
+              </div>
+              <div className="divide-y">
+                {bookings.map((b) => {
+                  // Calculate if this is a refund case
+                  const isRefundCase = b.status === "refund_pending";
+                  const deposit = b.pricing?.deposit || 0;
+                  const additionalCharges = b.pricing?.additionalCharges?.reduce((sum, c) => sum + c.amount, 0) || 0;
+                  const requiresCustomerPayment = additionalCharges > deposit;
+                  const refundAmount = b.depositRefund?.amount || 0;
+                  
+                  // Determine status badge and action
+                  let statusBadge, statusText, actionType;
+                  
+                  if (isRefundCase) {
+                    if (requiresCustomerPayment) {
+                      // Case: Additional charges > deposit, waiting for customer to pay via VNPAY
+                      statusBadge = "bg-orange-100 text-orange-800";
+                      statusText = "⏳ Chờ khách thanh toán bổ sung";
+                      actionType = "waiting";
+                    } else {
+                      // Case: Additional charges <= deposit, staff needs to refund
+                      statusBadge = "bg-yellow-100 text-yellow-800";
+                      statusText = "💰 Cần hoàn tiền cọc";
+                      actionType = "refund";
+                    }
+                  } else {
+                    // Case: Normal payment (confirmed booking)
+                    statusBadge = b.payment?.status === "paid" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800";
+                    statusText = b.payment?.status === "paid" ? "✅ Đã thanh toán" : "💳 Chờ thanh toán";
+                    actionType = "payment";
+                  }
+
+                  return (
+                    <div
+                      key={b._id}
+                      onClick={async () => {
+                        if (actionType === "waiting") {
+                          // Don't allow clicking if waiting for customer payment
+                          toast.info("Đang chờ khách hàng thanh toán chi phí phát sinh qua VNPAY");
+                          return;
+                        }
+                        
+                        if (actionType === "refund") {
+                          // Redirect to refund management page for refund cases
+                          window.location.href = "/staff/refund";
+                          return;
+                        }
+                        
+                        try {
+                          setLoading(true);
+                          setBooking(b);
+                          
+                          // For normal payment case
+                          const summary = await staffService.getPaymentSummary(b._id);
+                          setPaymentSummary(summary);
+                          if (summary.amountDue > 0) {
+                            setPaidAmount(summary.amountDue.toString());
+                          }
+                          
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        } catch (err) {
+                          console.error("Error loading payment info:", err);
+                          toast.error("Không thể tải thông tin thanh toán");
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      className={`p-6 transition-colors ${
+                        actionType === "waiting" 
+                          ? "bg-orange-50 cursor-not-allowed opacity-75" 
+                          : "hover:bg-gray-50 cursor-pointer"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-3">
+                            <h3 className="text-lg font-bold text-gray-900">
+                              {b.bookingCode}
+                            </h3>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge}`}>
+                              {statusText}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <User className="w-4 h-4" />
+                              <span className="font-medium">
+                                {b.renter?.fullName || "N/A"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <Car className="w-4 h-4" />
+                              <span>
+                                {b.vehicle?.name} ({b.vehicle?.licensePlate})
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-gray-600 md:col-span-2">
+                              <Calendar className="w-4 h-4" />
+                              <span>
+                                {new Date(b.startDate).toLocaleDateString("vi-VN")} -{" "}
+                                {new Date(b.endDate).toLocaleDateString("vi-VN")}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Additional info for refund cases */}
+                          {isRefundCase && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-gray-600">Tiền cọc:</span>
+                                  <span className="ml-1 font-semibold">{deposit.toLocaleString()}đ</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">Chi phí phát sinh:</span>
+                                  <span className="ml-1 font-semibold text-red-600">{additionalCharges.toLocaleString()}đ</span>
+                                </div>
+                              </div>
+                              {requiresCustomerPayment && (
+                                <p className="text-xs text-orange-700 mt-2 font-medium">
+                                  🔔 Khách cần thanh toán thêm {(additionalCharges - deposit).toLocaleString()}đ qua VNPAY
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="ml-4 text-right">
+                          {isRefundCase ? (
+                            requiresCustomerPayment ? (
+                              <>
+                                <p className="text-sm text-orange-600 mb-1">Cần thanh toán thêm</p>
+                                <p className="text-2xl font-bold text-red-600">
+                                  +{(additionalCharges - deposit).toLocaleString()}đ
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-sm text-gray-600 mb-1">Hoàn lại</p>
+                                <p className="text-2xl font-bold text-green-600">
+                                  {refundAmount.toLocaleString()}đ
+                                </p>
+                              </>
+                            )
+                          ) : (
+                            <>
+                              <p className="text-sm text-gray-600 mb-1">Tổng tiền</p>
+                              <p className="text-2xl font-bold text-green-600">
+                                {b.pricing?.totalAmount?.toLocaleString()}đ
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

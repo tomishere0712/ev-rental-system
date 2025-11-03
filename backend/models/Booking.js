@@ -150,11 +150,10 @@ const bookingSchema = new mongoose.Schema(
       orderId: String, // VNPay order ID for payment tracking
       transactionId: String, // VNPay transaction ID after payment
       paidAt: Date,
-      method: { type: String, default: "vnpay" },
+      method: String,
       status: {
         type: String,
         enum: ["pending", "completed", "failed"],
-        default: "pending",
       },
       notes: String,
     },

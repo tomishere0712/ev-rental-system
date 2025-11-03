@@ -29,6 +29,7 @@ import CustomerVerificationPage from "./pages/staff/CustomerVerificationPage";
 import StationVehiclesPage from "./pages/staff/StationVehiclesPage";
 import ProcessPaymentPage from "./pages/staff/ProcessPaymentPage";
 import StaffProfilePage from "./pages/staff/StaffProfilePage";
+import RefundManagementPage from "./pages/staff/RefundManagementPage";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -121,6 +122,7 @@ function App() {
         <Route path="/staff/verify" element={<CustomerVerificationPage />} />
         <Route path="/staff/vehicles" element={<StationVehiclesPage />} />
         <Route path="/staff/payment" element={<ProcessPaymentPage />} />
+        <Route path="/staff/refund" element={<RefundManagementPage />} />
         <Route path="/staff/profile" element={<StaffProfilePage />} />
       </Route>
 

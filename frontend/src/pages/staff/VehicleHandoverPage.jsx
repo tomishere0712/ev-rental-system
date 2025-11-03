@@ -31,7 +31,6 @@ const VehicleHandoverPage = () => {
   const [returnBattery, setReturnBattery] = useState("");
   const [returnNotes, setReturnNotes] = useState("");
   const [lateFees, setLateFees] = useState(0);
-  const [additionalPaymentTransactionId, setAdditionalPaymentTransactionId] = useState("");
 
   // Load all confirmed/in-progress bookings on mount
   useEffect(() => {
@@ -262,7 +261,6 @@ const VehicleHandoverPage = () => {
     setReturnBattery("");
     setReturnNotes("");
     setLateFees(0);
-    setAdditionalPaymentTransactionId("");
   };
 
   const getStatusBadge = (status) => {
@@ -728,27 +726,40 @@ const VehicleHandoverPage = () => {
                       )}
                     </div>
 
-                    {/* Additional Payment Transaction ID - Show only if late fees exceed deposit */}
+                    {/* Additional Payment Notice - Show only if late fees exceed deposit */}
                     {lateFees > (selectedBooking.pricing?.deposit || 0) && (
-                      <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
-                        <label className="block text-sm font-medium text-red-900 mb-2">
-                          <AlertCircle className="w-4 h-4 inline mr-1" />
-                          Mã giao dịch thanh toán bổ sung *
-                        </label>
-                        <input
-                          type="text"
-                          value={additionalPaymentTransactionId}
-                          onChange={(e) => setAdditionalPaymentTransactionId(e.target.value)}
-                          className="w-full px-4 py-2 border-2 border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                          placeholder="Nhập mã giao dịch ngân hàng (VD: 1234567890)"
-                          required
-                        />
-                        <p className="text-xs text-red-700 mt-1">
-                          ⚠️ Bắt buộc: Yêu cầu khách hàng chuyển khoản thêm {(lateFees - (selectedBooking.pricing?.deposit || 0)).toLocaleString()} VNĐ và nhập mã giao dịch
-                        </p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          📅 Thời gian xác nhận sẽ tự động ghi nhận khi bạn hoàn tất nhận trả xe
-                        </p>
+                      <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <h4 className="text-sm font-semibold text-orange-900 mb-2">
+                              💳 Chi phí phát sinh vượt tiền cọc
+                            </h4>
+                            <p className="text-sm text-orange-800 mb-2">
+                              Khách hàng cần thanh toán thêm:{" "}
+                              <span className="font-bold text-lg text-red-600">
+                                {(lateFees - (selectedBooking.pricing?.deposit || 0)).toLocaleString()}đ
+                              </span>
+                            </p>
+                            <div className="bg-white rounded p-3 text-xs space-y-1">
+                              <p className="text-gray-700">
+                                ✅ <strong>Bước 1:</strong> Bạn xác nhận nhận trả xe (click nút bên dưới)
+                              </p>
+                              <p className="text-gray-700">
+                                ✅ <strong>Bước 2:</strong> Hệ thống tạo yêu cầu thanh toán VNPAY cho khách hàng
+                              </p>
+                              <p className="text-gray-700">
+                                ✅ <strong>Bước 3:</strong> Khách hàng thanh toán qua VNPAY trên app/trang booking
+                              </p>
+                              <p className="text-gray-700">
+                                ✅ <strong>Bước 4:</strong> Sau khi thanh toán xong, booking chuyển sang chờ hoàn cọc
+                              </p>
+                            </div>
+                            <p className="text-xs text-orange-700 mt-2 font-medium">
+                              � Không cần nhập mã giao dịch thủ công. Khách hàng sẽ thanh toán online qua VNPAY.
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     )}
 

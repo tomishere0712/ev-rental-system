@@ -9,6 +9,7 @@ import {
   AlertCircle,
   TrendingUp,
   Package,
+  DollarSign,
 } from "lucide-react";
 import { staffService } from "../../services";
 import toast from "react-hot-toast";
@@ -159,7 +160,7 @@ const StaffDashboard = () => {
         <h2 className="text-xl font-bold text-gray-900 mb-4">
           Hành động nhanh
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
             to="/staff/verify"
             className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-all"
@@ -190,6 +191,17 @@ const StaffDashboard = () => {
             <div>
               <p className="font-semibold text-gray-900">Xử lý thanh toán</p>
               <p className="text-sm text-gray-600">Thu tiền thuê xe</p>
+            </div>
+          </Link>
+
+          <Link
+            to="/staff/refund"
+            className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all"
+          >
+            <DollarSign className="w-8 h-8 text-green-600 mr-3" />
+            <div>
+              <p className="font-semibold text-gray-900">Hoàn tiền cọc</p>
+              <p className="text-sm text-gray-600">Xử lý hoàn cọc</p>
             </div>
           </Link>
         </div>

@@ -920,8 +920,10 @@ exports.confirmManualRefund = async (req, res) => {
       });
     }
 
-    // Verify staff is at the correct station
+    // Verify staff is at the correct station (if returnStation is set)
     if (
+      booking.returnStation && 
+      req.user.assignedStation &&
       booking.returnStation.toString() !== req.user.assignedStation.toString()
     ) {
       return res
@@ -945,11 +947,13 @@ exports.confirmManualRefund = async (req, res) => {
     }
 
     // Calculate refund amount (should be deposit - additional charges)
-    const totalAdditionalCharges = booking.pricing.additionalCharges.reduce(
+    const totalAdditionalCharges = booking.pricing?.additionalCharges?.reduce(
       (sum, charge) => sum + charge.amount,
       0
-    );
-    const calculatedRefund = booking.pricing.deposit - totalAdditionalCharges;
+    ) || 0;
+    
+    const deposit = booking.pricing?.deposit || 0;
+    const calculatedRefund = deposit - totalAdditionalCharges;
 
     if (refundAmount && Math.abs(refundAmount - calculatedRefund) > 1) {
       return res.status(400).json({
@@ -980,6 +984,7 @@ exports.confirmManualRefund = async (req, res) => {
       amount: calculatedRefund,
       method: "bank-transfer",
       status: "completed",
+      transactionId: transferReference || `REF${Date.now()}`, // Add required transactionId
       processedBy: req.user._id,
       paidAt: new Date(),
       notes: `Hoàn tiền cọc. ${transferNotes || ""}`,
