@@ -87,11 +87,11 @@ function MainTabs() {
 
 // Root Navigator
 export function RootNavigator() {
-  const authContext = useAuth();
-  
-  // Safe check for loading state
-  const isLoading = authContext?.loading ?? true;
-  const currentUser = authContext?.user ?? null;
+  const { user, loading } = useAuth();
+
+  // Convert to boolean explicitly
+  const isLoading = Boolean(loading);
+  const hasUser = Boolean(user);
 
   if (isLoading) {
     return (
@@ -103,7 +103,7 @@ export function RootNavigator() {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {currentUser ? (
+      {hasUser ? (
         <>
           <Stack.Screen 
             name="Main" 
