@@ -17,6 +17,8 @@ const StaffDashboard = () => {
   const [stats, setStats] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirmModal, setConfirmModal] = useState({ show: false, booking: null });
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -25,18 +27,55 @@ const StaffDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      console.log("🔄 Fetching staff dashboard data...");
+      
       const [statsResponse, bookingsResponse] = await Promise.all([
         staffService.getStats(),
-        staffService.getBookings({ status: "pending,confirmed,picked-up" }),
+        staffService.getBookings({ status: "pending,confirmed,in-progress,pending_return,refund_pending,completed" }),
       ]);
+
+      console.log("📊 Stats response:", statsResponse);
+      console.log("📋 Bookings response:", bookingsResponse);
+      console.log("📋 Bookings data:", bookingsResponse.data);
+      console.log("📋 Bookings count:", bookingsResponse.data?.length || 0);
+      
+      if (bookingsResponse.data && bookingsResponse.data.length > 0) {
+        console.log("📋 Booking statuses:", bookingsResponse.data.map(b => ({
+          number: b.bookingNumber,
+          status: b.status,
+          renter: b.renter?.fullName || b.renter?.email
+        })));
+      }
 
       setStats(statsResponse.data);
       setBookings(bookingsResponse.data || []);
+      console.log("✅ Dashboard data loaded");
     } catch (error) {
+      console.error("❌ Dashboard fetch error:", error);
       toast.error("Không thể tải dữ liệu dashboard");
-      console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmBooking = async () => {
+    if (!confirmModal.booking) return;
+    
+    setConfirming(true);
+    try {
+      await staffService.verifyCustomer(confirmModal.booking._id, {
+        approved: true,
+        notes: "Đã xác nhận booking"
+      });
+      
+      toast.success("Đã xác nhận booking thành công!");
+      setConfirmModal({ show: false, booking: null });
+      fetchDashboardData(); // Refresh data
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Không thể xác nhận booking");
+      console.error(error);
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -47,7 +86,10 @@ const StaffDashboard = () => {
         color: "bg-yellow-100 text-yellow-800",
       },
       confirmed: { label: "Đã xác thực", color: "bg-blue-100 text-blue-800" },
-      "picked-up": { label: "Đang thuê", color: "bg-green-100 text-green-800" },
+      "in-progress": { label: "Đang thuê", color: "bg-green-100 text-green-800" },
+      "pending_return": { label: "Chờ trả xe", color: "bg-orange-100 text-orange-800" },
+      "refund_pending": { label: "Chờ hoàn cọc", color: "bg-purple-100 text-purple-800" },
+      completed: { label: "Hoàn thành", color: "bg-gray-100 text-gray-800" },
     };
     const { label, color } = config[status] || config.pending;
     return (
@@ -234,12 +276,12 @@ const StaffDashboard = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {booking.status === "pending" && (
-                        <Link
-                          to={`/staff/verify?booking=${booking._id}`}
+                        <button
+                          onClick={() => setConfirmModal({ show: true, booking })}
                           className="text-primary-600 hover:text-primary-700 font-medium"
                         >
-                          Xác thực
-                        </Link>
+                          Xác nhận
+                        </button>
                       )}
                       {booking.status === "confirmed" && (
                         <Link
@@ -249,12 +291,20 @@ const StaffDashboard = () => {
                           Giao xe
                         </Link>
                       )}
-                      {booking.status === "picked-up" && (
+                      {booking.status === "in-progress" && (
                         <Link
-                          to={`/staff/payment?booking=${booking._id}`}
+                          to={`/staff/handover?booking=${booking._id}`}
                           className="text-primary-600 hover:text-primary-700 font-medium"
                         >
-                          Thanh toán
+                          Nhận trả xe
+                        </Link>
+                      )}
+                      {booking.status === "pending_return" && (
+                        <Link
+                          to={`/staff/handover?booking=${booking._id}`}
+                          className="text-orange-600 hover:text-orange-700 font-medium"
+                        >
+                          Xử lý trả xe
                         </Link>
                       )}
                     </td>
@@ -265,6 +315,75 @@ const StaffDashboard = () => {
           </table>
         </div>
       </div>
+
+      {/* Confirm Booking Modal */}
+      {confirmModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              Xác nhận Booking
+            </h3>
+            
+            <div className="mb-6 space-y-3">
+              <p className="text-gray-700">
+                Bạn có chắc muốn xác nhận booking này?
+              </p>
+              
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Mã booking:</span>
+                  <span className="font-semibold">
+                    #{confirmModal.booking?.bookingNumber || confirmModal.booking?._id.slice(-6)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Khách hàng:</span>
+                  <span className="font-semibold">
+                    {confirmModal.booking?.renter?.fullName || confirmModal.booking?.userId?.fullName || "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Xe:</span>
+                  <span className="font-semibold">
+                    {confirmModal.booking?.vehicle?.name || confirmModal.booking?.vehicleId?.name || "N/A"}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600">
+                Sau khi xác nhận, booking sẽ chuyển sang trạng thái <span className="font-semibold text-blue-600">"Đã xác nhận"</span> và sẵn sàng để giao xe.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmModal({ show: false, booking: null })}
+                disabled={confirming}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmBooking}
+                disabled={confirming}
+                className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {confirming ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Xác nhận
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

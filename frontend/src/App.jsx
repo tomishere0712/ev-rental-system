@@ -90,6 +90,8 @@ function App() {
       <Route path="/payment/sandbox" element={<PaymentSandboxPage />} />
       <Route path="/payment/success" element={<PaymentResultPage />} />
       <Route path="/payment/failed" element={<PaymentResultPage />} />
+      <Route path="/payment/additional-success" element={<PaymentResultPage />} />
+      <Route path="/payment/additional-failed" element={<PaymentResultPage />} />
 
       {/* Renter Routes */}
       <Route

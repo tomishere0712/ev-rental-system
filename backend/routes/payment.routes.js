@@ -10,6 +10,8 @@ const {
   createVNPayUrl,
   vnpayReturn,
   vnpayQuery,
+  createVNPayAdditionalUrl,
+  vnpayAdditionalReturn,
 } = require("../controllers/payment.controller");
 
 // @route   POST /api/payments
@@ -36,6 +38,16 @@ router.post("/create-vnpay-url", protect, createVNPayUrl);
 // @desc    Handle VNPay return callback
 // @access  Public
 router.get("/vnpay-return", vnpayReturn);
+
+// @route   POST /api/payments/create-vnpay-additional-url
+// @desc    Create VNPay payment URL for additional charges
+// @access  Private (Renter)
+router.post("/create-vnpay-additional-url", protect, createVNPayAdditionalUrl);
+
+// @route   GET /api/payments/vnpay-additional-return
+// @desc    Handle VNPay additional payment return callback
+// @access  Public
+router.get("/vnpay-additional-return", vnpayAdditionalReturn);
 
 // @route   POST /api/payments/vnpay-query
 // @desc    Query VNPay transaction

@@ -10,6 +10,7 @@ const PaymentResultPage = () => {
   const bookingId = searchParams.get("bookingId");
   const orderId = searchParams.get("orderId");
   const isSuccess = window.location.pathname.includes("success");
+  const isAdditionalPayment = window.location.pathname.includes("additional");
   const errorCode = searchParams.get("code");
   const errorMessage = searchParams.get("error");
 
@@ -51,10 +52,13 @@ const PaymentResultPage = () => {
 
             {/* Title */}
             <h1 className="text-3xl font-bold text-gray-900 mb-3">
-              Thanh toán thành công!
+              {isAdditionalPayment ? "Thanh toán chi phí phát sinh thành công!" : "Thanh toán thành công!"}
             </h1>
             <p className="text-gray-600 mb-6">
-              Đơn thuê xe của bạn đã được xác nhận
+              {isAdditionalPayment 
+                ? "Chi phí phát sinh đã được thanh toán. Đơn thuê xe của bạn sẽ sớm được hoàn tất."
+                : "Đơn thuê xe của bạn đã được xác nhận"
+              }
             </p>
 
             {/* Order Info */}
@@ -123,10 +127,13 @@ const PaymentResultPage = () => {
 
           {/* Title */}
           <h1 className="text-3xl font-bold text-gray-900 mb-3">
-            Thanh toán thất bại
+            {isAdditionalPayment ? "Thanh toán chi phí phát sinh thất bại" : "Thanh toán thất bại"}
           </h1>
           <p className="text-gray-600 mb-6">
-            Đã có lỗi xảy ra trong quá trình thanh toán
+            {isAdditionalPayment
+              ? "Đã có lỗi xảy ra khi thanh toán chi phí phát sinh"
+              : "Đã có lỗi xảy ra trong quá trình thanh toán"
+            }
           </p>
 
           {/* Error Info */}

@@ -32,9 +32,11 @@ exports.getStationBookings = async (req, res) => {
 
     // Add search filter (booking number or user email)
     if (search) {
-      // First, find booking by booking number
+      console.log("🔍 Searching for:", search);
+      
+      // First, find booking by booking number (case-insensitive, partial match)
       const bookingByNumber = await Booking.findOne({
-        bookingNumber: search,
+        bookingNumber: { $regex: search, $options: "i" },
         pickupStation: staff.assignedStation,
       })
         .populate("renter", "fullName email phone")
@@ -43,22 +45,30 @@ exports.getStationBookings = async (req, res) => {
         .populate("returnStation", "name address");
 
       if (bookingByNumber) {
-        console.log("Found booking by number:", bookingByNumber.bookingNumber);
+        console.log("✅ Found booking by number:", bookingByNumber.bookingNumber);
+        console.log("  → Status:", bookingByNumber.status);
+        console.log("  → Renter:", bookingByNumber.renter?.fullName);
+        console.log("  → Vehicle:", bookingByNumber.vehicle?.name);
         return res.json({
           success: true,
           data: [bookingByNumber],
         });
       }
 
+      console.log("❌ No booking found by number, searching by email...");
+
       // If not found by booking number, search by user email
       const usersByEmail = await User.find({
         email: { $regex: search, $options: "i" },
       }).select("_id");
 
+      console.log("📧 Users found by email:", usersByEmail.length);
+
       if (usersByEmail.length > 0) {
         filter.renter = { $in: usersByEmail.map((u) => u._id) };
       } else {
         // No user found with this email
+        console.log("❌ No bookings or users found");
         return res.json({
           success: true,
           data: [],
@@ -339,14 +349,22 @@ exports.reconsiderVerification = async (req, res) => {
 // @access  Private/Staff
 exports.handoverVehicle = async (req, res) => {
   try {
-    const { batteryLevel, odometer, condition, photos, notes, signature } =
+    const { pickupBatteryLevel, pickupPhotos, pickupNotes, signature, batteryLevel, odometer, condition, photos, notes } =
       req.body;
+
+    console.log("🚗 Handover request:", req.params.id);
+    console.log("📦 Body:", req.body);
+    console.log("👤 User:", req.user.id);
 
     const booking = await Booking.findById(req.params.id).populate("vehicle");
 
     if (!booking) {
       return res.status(404).json({ message: "Không tìm thấy booking" });
     }
+
+    console.log("📋 Booking found:", booking.bookingNumber);
+    console.log("📍 Pickup station:", booking.pickupStation);
+    console.log("👷 Staff station:", req.user.assignedStation);
 
     if (booking.status !== "confirmed") {
       return res.status(400).json({
@@ -355,24 +373,26 @@ exports.handoverVehicle = async (req, res) => {
       });
     }
 
-    // Verify staff is at the correct station
-    if (
-      booking.pickupStation.toString() !== req.user.assignedStation.toString()
-    ) {
-      return res
-        .status(403)
-        .json({ message: "Bạn không có quyền xử lý booking này" });
+    // Verify staff is at the correct station (only if both exist)
+    if (booking.pickupStation && req.user.assignedStation) {
+      if (
+        booking.pickupStation.toString() !== req.user.assignedStation.toString()
+      ) {
+        return res
+          .status(403)
+          .json({ message: "Bạn không có quyền xử lý booking này" });
+      }
     }
 
-    // Update pickup details
+    // Update pickup details - Support both old and new field names
     booking.pickupDetails = {
       checkedInAt: new Date(),
       checkedInBy: req.user._id,
-      batteryLevel: batteryLevel,
-      odometer: odometer,
+      batteryLevel: pickupBatteryLevel || batteryLevel || 0,
+      odometer: odometer || 0,
       condition: condition || "good",
-      photos: photos || [],
-      notes: notes || "",
+      photos: pickupPhotos || photos || [],
+      notes: pickupNotes || notes || "",
       signature: signature || "",
     };
 
@@ -382,12 +402,16 @@ exports.handoverVehicle = async (req, res) => {
 
     await booking.save();
 
+    console.log("✅ Booking updated, updating vehicle...");
+
     // Update vehicle status
     await Vehicle.findByIdAndUpdate(booking.vehicle._id, {
       status: "rented",
-      batteryLevel: batteryLevel,
-      odometer: odometer,
+      batteryLevel: pickupBatteryLevel || batteryLevel || 0,
+      odometer: odometer || 0,
     });
+
+    console.log("✅ Handover complete!");
 
     res.json({
       success: true,
@@ -396,6 +420,7 @@ exports.handoverVehicle = async (req, res) => {
         "Đã bàn giao xe thành công. Chúc khách hàng có chuyến đi an toàn!",
     });
   } catch (error) {
+    console.error("💥 Handover error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -407,14 +432,22 @@ exports.returnVehicle = async (req, res) => {
   try {
     const {
       batteryLevel,
+      returnBatteryLevel,
       odometer,
       condition,
       photos,
+      returnPhotos,
       notes,
+      returnNotes,
       damageReport,
       additionalCharges = {}, // { cleaning: 0, repair: 0, lateFee: 0 }
+      lateFees,
       userConfirmed,
+      additionalPayment, // New field for payment when lateFees > deposit
     } = req.body;
+
+    console.log("🔙 Return vehicle request:", req.params.id);
+    console.log("📦 Body:", req.body);
 
     const booking = await Booking.findById(req.params.id).populate("vehicle");
 
@@ -422,19 +455,27 @@ exports.returnVehicle = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy booking" });
     }
 
-    if (booking.status !== "in-progress") {
+    console.log("🔙 Return vehicle - Booking status:", booking.status);
+
+    // Allow return for both in-progress and pending_return status
+    if (booking.status !== "in-progress" && booking.status !== "pending_return") {
       return res
         .status(400)
-        .json({ message: "Xe chưa được bàn giao hoặc đã trả" });
+        .json({ message: "Xe chưa được bàn giao hoặc đã trả. Trạng thái hiện tại: " + booking.status });
     }
 
-    // Verify staff is at the correct station
-    if (
-      booking.returnStation.toString() !== req.user.assignedStation.toString()
-    ) {
-      return res
-        .status(403)
-        .json({ message: "Bạn không có quyền xử lý booking này" });
+    console.log("📍 Return station:", booking.returnStation);
+    console.log("👷 Staff station:", req.user.assignedStation);
+
+    // Verify staff is at the correct station (only if both values exist)
+    if (booking.returnStation && req.user.assignedStation) {
+      if (
+        booking.returnStation.toString() !== req.user.assignedStation.toString()
+      ) {
+        return res
+          .status(403)
+          .json({ message: "Bạn không có quyền xử lý booking này" });
+      }
     }
 
     // Calculate late fees
@@ -444,82 +485,151 @@ exports.returnVehicle = async (req, res) => {
 
     if (now > expectedReturn) {
       const lateHours = Math.ceil((now - expectedReturn) / (1000 * 60 * 60));
-      calculatedLateFee = lateHours * booking.vehicle.pricePerHour * 1.5; // 1.5x for late fees
+      const hourlyRate = booking.vehicle?.pricePerHour || booking.vehicle?.pricePerDay / 24 || 0;
+      calculatedLateFee = lateHours * hourlyRate * 1.5; // 1.5x for late fees
+      console.log("⏰ Late return detected:", { lateHours, hourlyRate, calculatedLateFee });
     }
 
-    const lateFee = additionalCharges.lateFee || calculatedLateFee;
+    // Support both old (additionalCharges) and new (lateFees) formats
+    const lateFee = lateFees || additionalCharges.lateFee || calculatedLateFee;
     const cleaningFee = additionalCharges.cleaning || 0;
     const repairFee = additionalCharges.repair || 0;
     const totalAdditionalCharges = lateFee + cleaningFee + repairFee;
 
-    // Update return details
+    console.log("💰 Late fees:", { calculatedLateFee, lateFee, totalAdditionalCharges });
+    console.log("💰 Deposit:", booking.pricing?.deposit || 0);
+
+    // Update return details - Support both old and new field names
     booking.returnDetails = {
       checkedInAt: new Date(),
       checkedInBy: req.user._id,
-      batteryLevel,
-      odometer,
-      condition,
-      photos: photos || [],
-      notes,
-      damageReport,
+      batteryLevel: returnBatteryLevel || batteryLevel || 0,
+      odometer: odometer || 0,
+      condition: condition || "good",
+      photos: returnPhotos || photos || [],
+      notes: returnNotes || notes || "",
+      damageReport: damageReport || "",
     };
+
+    console.log("✅ Return details:", booking.returnDetails);
+
+    // Initialize pricing if not exists
+    if (!booking.pricing) {
+      booking.pricing = {
+        basePrice: 0,
+        deposit: 0,
+        additionalCharges: [],
+        discount: 0,
+        totalAmount: 0,
+      };
+    }
+
+    // Initialize additionalCharges array if not exists
+    if (!Array.isArray(booking.pricing.additionalCharges)) {
+      booking.pricing.additionalCharges = [];
+    }
+
+    console.log("💰 Current additional charges:", booking.pricing.additionalCharges);
 
     // Add additional charges to pricing
     if (totalAdditionalCharges > 0) {
       if (lateFee > 0) {
+        const lateHours = now > expectedReturn ? Math.ceil((now - expectedReturn) / (1000 * 60 * 60)) : 0;
+        const description = lateHours > 0 
+          ? `Phí trả muộn: ${lateHours} giờ`
+          : "Phí trả muộn và các chi phí khác";
         booking.pricing.additionalCharges.push({
           type: "late_fee",
-          amount: lateFee,
-          description: `Phí trả muộn: ${Math.ceil(
-            (now - expectedReturn) / (1000 * 60 * 60)
-          )} giờ`,
+          amount: Number(lateFee),
+          description: description,
         });
+        console.log("➕ Added late fee:", lateFee);
       }
       if (cleaningFee > 0) {
         booking.pricing.additionalCharges.push({
           type: "cleaning",
-          amount: cleaningFee,
+          amount: Number(cleaningFee),
           description: "Phí vệ sinh xe",
         });
+        console.log("➕ Added cleaning fee:", cleaningFee);
       }
       if (repairFee > 0) {
         booking.pricing.additionalCharges.push({
           type: "repair",
-          amount: repairFee,
+          amount: Number(repairFee),
           description: damageReport || "Phí sửa chữa",
         });
+        console.log("➕ Added repair fee:", repairFee);
       }
 
-      // Update status to require additional payment
-      booking.status = "returning";
+      console.log("💰 Total charges after push:", booking.pricing.additionalCharges.length);
 
-      // Create payment record for additional charges
-      const Payment = require("../models/Payment");
-      await Payment.create({
-        booking: booking._id,
-        user: booking.renter,
-        type: "additional",
-        amount: totalAdditionalCharges,
-        method: "online",
-        status: "pending",
-        notes: `Phí phát sinh: ${lateFee > 0 ? "Trả muộn, " : ""}${
-          cleaningFee > 0 ? "Vệ sinh, " : ""
-        }${repairFee > 0 ? "Sửa chữa" : ""}`,
-      });
+      // Check if additional payment is required (lateFees > deposit)
+      const deposit = booking.pricing.deposit || 0;
+      const requiresAdditionalPayment = totalAdditionalCharges > deposit;
+
+      console.log("🔍 Requires additional payment:", requiresAdditionalPayment);
+
+      if (requiresAdditionalPayment) {
+        // Additional payment required - Create pending payment
+        console.log("💳 Additional payment required, creating pending payment...");
+
+        try {
+          const additionalAmount = totalAdditionalCharges - deposit;
+          
+          // Save additional payment info as pending (waiting for VNPAY payment)
+          booking.additionalPayment = {
+            amount: additionalAmount,
+            transactionId: null, // Will be set after VNPAY payment
+            paidAt: null, // Will be set after VNPAY payment
+            method: "vnpay",
+            status: "pending", // Pending payment via VNPAY
+            notes: `Cần thanh toán thêm ${additionalAmount}đ do chi phí phát sinh vượt tiền cọc`,
+          };
+
+          // Keep status as pending_return until payment is completed
+          booking.status = "pending_return";
+          booking.depositRefund = {
+            amount: 0, // No refund since charges exceeded deposit
+            method: "none",
+            status: "pending_payment", // Waiting for additional payment
+            notes: `Chi phí phát sinh ${totalAdditionalCharges}đ vượt tiền cọc ${deposit}đ. Chờ thanh toán thêm ${additionalAmount}đ qua VNPAY`,
+          };
+          
+          console.log("✅ Pending payment created:", booking.additionalPayment);
+        } catch (err) {
+          console.error("❌ Error creating pending payment:", err);
+          throw new Error("Không thể tạo yêu cầu thanh toán bổ sung: " + err.message);
+        }
+      } else {
+        // Additional charges exist but within deposit
+        booking.status = "refund_pending";
+        const refundAmount = deposit - totalAdditionalCharges;
+        booking.depositRefund = {
+          amount: refundAmount,
+          method: "manual",
+          status: "pending",
+          notes: `Tiền cọc ${deposit}đ - Chi phí phát sinh ${totalAdditionalCharges}đ = Hoàn ${refundAmount}đ`,
+        };
+        console.log("✅ Refund calculated:", booking.depositRefund);
+      }
     } else {
       // No additional charges, move to refund_pending
       booking.status = "refund_pending";
 
-      // Calculate refund amount (deposit - additional charges)
-      const refundAmount = booking.pricing.deposit;
+      // Calculate refund amount (full deposit)
+      const refundAmount = booking.pricing?.deposit || 0;
       booking.depositRefund = {
         amount: refundAmount,
         method: "manual",
         status: "pending",
       };
+      console.log("✅ Full refund:", booking.depositRefund);
     }
 
+    console.log("💾 Saving booking...");
     await booking.save();
+    console.log("✅ Booking saved successfully");
 
     // Update vehicle status to available
     await Vehicle.findByIdAndUpdate(booking.vehicle._id, {
@@ -533,10 +643,13 @@ exports.returnVehicle = async (req, res) => {
       data: booking,
       message:
         totalAdditionalCharges > 0
-          ? `Xe đã được kiểm tra. Khách hàng cần thanh toán ${totalAdditionalCharges.toLocaleString()}đ phí phát sinh`
+          ? booking.additionalPayment 
+            ? `Xe đã được trả thành công. Đã thanh toán thêm ${booking.additionalPayment.amount.toLocaleString()}đ. Chờ xác nhận hoàn thành.`
+            : `Xe đã được kiểm tra. Chờ hoàn tiền cọc ${booking.depositRefund.amount.toLocaleString()}đ`
           : "Xe đã được kiểm tra và trả về thành công. Chờ xác nhận hoàn tiền",
     });
   } catch (error) {
+    console.error("💥 Return vehicle error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -904,6 +1017,9 @@ exports.getStaffStats = async (req, res) => {
     // Get today's bookings
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
     const pendingBookings = await Booking.countDocuments({
       pickupStation: staff.assignedStation,
@@ -912,19 +1028,19 @@ exports.getStaffStats = async (req, res) => {
 
     const activeRentals = await Booking.countDocuments({
       pickupStation: staff.assignedStation,
-      status: "picked-up",
+      status: "in-progress",
     });
 
     const todayPickups = await Booking.countDocuments({
       pickupStation: staff.assignedStation,
-      startDate: { $gte: today },
-      status: { $in: ["confirmed", "picked-up"] },
+      startDate: { $gte: today, $lt: tomorrow },
+      status: { $in: ["confirmed", "in-progress"] },
     });
 
     const todayReturns = await Booking.countDocuments({
       returnStation: staff.assignedStation,
-      endDate: { $lte: new Date() },
-      status: "picked-up",
+      endDate: { $gte: today, $lt: tomorrow },
+      status: { $in: ["in-progress", "pending_return"] },
     });
 
     const stationVehicles = await Vehicle.countDocuments({

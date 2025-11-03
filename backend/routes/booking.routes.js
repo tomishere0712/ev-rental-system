@@ -9,6 +9,8 @@ const {
   signContract,
   getRentalHistory,
   confirmRefundReceived,
+  confirmAdditionalPayment,
+  requestReturn,
 } = require("../controllers/booking.controller");
 
 // @route   POST /api/bookings
@@ -54,6 +56,26 @@ router.post(
   protect,
   authorize("renter"),
   confirmRefundReceived
+);
+
+// @route   POST /api/bookings/:id/confirm-additional-payment
+// @desc    User confirms they paid the additional charges
+// @access  Private/Renter
+router.post(
+  "/:id/confirm-additional-payment",
+  protect,
+  authorize("renter"),
+  confirmAdditionalPayment
+);
+
+// @route   POST /api/bookings/:id/request-return
+// @desc    Renter requests vehicle return
+// @access  Private/Renter
+router.post(
+  "/:id/request-return",
+  protect,
+  authorize("renter"),
+  requestReturn
 );
 
 // @route   PUT /api/bookings/:id/pickup

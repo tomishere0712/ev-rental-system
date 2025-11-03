@@ -80,7 +80,7 @@ const bookingSchema = new mongoose.Schema(
       deposit: Number,
       additionalCharges: [
         {
-          type: String,
+          type: { type: String }, // Need to wrap 'type' field
           amount: Number,
           description: String,
         },
@@ -127,10 +127,10 @@ const bookingSchema = new mongoose.Schema(
     // Deposit Refund (Manual Bank Transfer)
     depositRefund: {
       amount: Number,
-      method: { type: String, default: "manual" }, // manual bank transfer
+      method: { type: String, enum: ["manual", "none"], default: "manual" }, // manual bank transfer or none if not applicable
       status: {
         type: String,
-        enum: ["pending", "refunded", "confirmed"],
+        enum: ["pending", "refunded", "confirmed", "not_applicable", "pending_payment"],
         default: "pending",
       },
       // Staff marks as refunded after bank transfer
@@ -138,9 +138,25 @@ const bookingSchema = new mongoose.Schema(
       refundedAt: Date,
       transferReference: String, // Bank transfer reference
       transferNotes: String,
+      notes: String, // General notes for refund status
       // User confirms receipt
       confirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       confirmedAt: Date,
+    },
+
+    // Additional Payment (When late fees exceed deposit)
+    additionalPayment: {
+      amount: Number,
+      orderId: String, // VNPay order ID for payment tracking
+      transactionId: String, // VNPay transaction ID after payment
+      paidAt: Date,
+      method: { type: String, default: "vnpay" },
+      status: {
+        type: String,
+        enum: ["pending", "completed", "failed"],
+        default: "pending",
+      },
+      notes: String,
     },
 
     // Status
