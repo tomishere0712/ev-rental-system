@@ -13,6 +13,7 @@ import VehicleDetailScreen from '../screens/vehicle/VehicleDetailScreen';
 import BookingListScreen from '../screens/booking/BookingListScreen';
 import BookingDetailScreen from '../screens/booking/BookingDetailScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import StationListScreen from '../screens/station/StationListScreen';
 
 import { useAuth } from '../store/AuthContext';
 
@@ -49,6 +50,8 @@ function MainTabs() {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Vehicles') {
             iconName = focused ? 'bicycle' : 'bicycle-outline';
+          } else if (route.name === 'Stations') {
+            iconName = focused ? 'location' : 'location-outline';
           } else if (route.name === 'Bookings') {
             iconName = focused ? 'list' : 'list-outline';
           } else if (route.name === 'Profile') {
@@ -70,6 +73,11 @@ function MainTabs() {
         name="Vehicles" 
         component={VehicleListScreen}
         options={{ headerTitle: 'Xe điện' }}
+      />
+      <Tab.Screen 
+        name="Stations" 
+        component={StationListScreen}
+        options={{ headerTitle: 'Điểm thuê' }}
       />
       <Tab.Screen 
         name="Bookings" 

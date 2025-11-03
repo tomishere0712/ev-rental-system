@@ -43,14 +43,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string) => {
     try {
       const response = await authService.login({ email, password });
-      const { token: newToken, user: newUser } = response;
+      const { token: newToken, ...userData } = response.data;
 
       // Save to AsyncStorage
       await AsyncStorage.setItem('token', newToken);
-      await AsyncStorage.setItem('user', JSON.stringify(newUser));
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
 
       setToken(newToken);
-      setUser(newUser);
+      setUser(userData);
     } catch (error) {
       throw error;
     }
@@ -59,14 +59,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const register = async (data: any) => {
     try {
       const response = await authService.register(data);
-      const { token: newToken, user: newUser } = response;
+      const { token: newToken, ...userData } = response.data;
 
       // Save to AsyncStorage
       await AsyncStorage.setItem('token', newToken);
-      await AsyncStorage.setItem('user', JSON.stringify(newUser));
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
 
       setToken(newToken);
-      setUser(newUser);
+      setUser(userData);
     } catch (error) {
       throw error;
     }

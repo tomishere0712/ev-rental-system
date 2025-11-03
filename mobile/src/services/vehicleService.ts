@@ -27,18 +27,24 @@ export interface Vehicle {
 export const vehicleService = {
   getAll: async (params?: any) => {
     const response = await api.get("/vehicles", { params });
-    return response.data;
+    // Backend returns { success: true, data: { vehicles: [...], total, totalPages, currentPage } }
+    return (
+      response.data.data?.vehicles ||
+      response.data.vehicles ||
+      response.data.data ||
+      response.data
+    );
   },
 
   getById: async (id: string) => {
     const response = await api.get(`/vehicles/${id}`);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   searchNearby: async (lat: number, lng: number, radius: number) => {
     const response = await api.get(
       `/vehicles/search/nearby?lat=${lat}&lng=${lng}&radius=${radius}`
     );
-    return response.data;
+    return response.data.data || response.data;
   },
 };
